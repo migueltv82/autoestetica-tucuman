@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import * as XLSX from 'xlsx';
+import AdminLayout from '../components/admin/AdminLayout.jsx';
 
 function AdminCash() {
-  const appointments = JSON.parse(localStorage.getItem('adminAppointments') || '[]');
+  const [appointments, setAppointments] = useState(() => {
+    return JSON.parse(localStorage.getItem('adminAppointments') || '[]');
+  });
 
   const [cashEntries, setCashEntries] = useState(() => {
     const saved = localStorage.getItem('adminCashEntries');
@@ -17,15 +21,83 @@ function AdminCash() {
     linkedAppointmentId: '',
   });
 
+  const [editingId, setEditingId] = useState(null);
+
+  const [filters, setFilters] = useState({
+    client: '',
+    paymentMethod: '',
+    dateFrom: '',
+    dateTo: '',
+  });
+
   const paymentMethods = ['Efectivo', 'Transferencia', 'Tarjeta', 'Mercado Pago', 'Otro'];
+
+  const recalculateAppointmentsPaymentStatus = (baseAppointments, baseCashEntries) => {
+    return baseAppointments.map((appointment) => {
+      const linkedPayments = baseCashEntries.filter(
+        (entry) => String(entry.linkedAppointmentId) === String(appointment.id)
+      );
+
+      const paidAmount = linkedPayments.reduce(
+        (acc, entry) => acc + Number(entry.amount || 0),
+        0
+      );
+
+      let paymentStatus = 'Pendiente';
+
+      if (paidAmount > 0 && paidAmount < Number(appointment.total || 0)) {
+        paymentStatus = 'Señado';
+      }
+
+      if (paidAmount >= Number(appointment.total || 0) && Number(appointment.total || 0) > 0) {
+        paymentStatus = 'Pagado';
+      }
+
+      return {
+        ...appointment,
+        paymentStatus,
+        paidAmount,
+      };
+    });
+  };
 
   useEffect(() => {
     localStorage.setItem('adminCashEntries', JSON.stringify(cashEntries));
   }, [cashEntries]);
 
-  const totalCollected = useMemo(() => {
-    return cashEntries.reduce((acc, item) => acc + Number(item.amount || 0), 0);
+  useEffect(() => {
+    const updatedAppointments = recalculateAppointmentsPaymentStatus(appointments, cashEntries);
+    setAppointments(updatedAppointments);
+    localStorage.setItem('adminAppointments', JSON.stringify(updatedAppointments));
   }, [cashEntries]);
+
+  const filteredCashEntries = useMemo(() => {
+    return cashEntries.filter((item) => {
+      const matchesClient = item.client
+        .toLowerCase()
+        .includes(filters.client.toLowerCase());
+
+      const matchesPaymentMethod = filters.paymentMethod
+        ? item.paymentMethod === filters.paymentMethod
+        : true;
+
+      const matchesDateFrom = filters.dateFrom ? item.date >= filters.dateFrom : true;
+      const matchesDateTo = filters.dateTo ? item.date <= filters.dateTo : true;
+
+      return (
+        matchesClient &&
+        matchesPaymentMethod &&
+        matchesDateFrom &&
+        matchesDateTo
+      );
+    });
+  }, [cashEntries, filters]);
+
+  const totalCollected = useMemo(() => {
+    return filteredCashEntries.reduce((acc, item) => acc + Number(item.amount || 0), 0);
+  }, [filteredCashEntries]);
+
+  const totalMovements = filteredCashEntries.length;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -38,8 +110,7 @@ function AdminCash() {
           ...prev,
           linkedAppointmentId: value,
           client: selected.client,
-          concept: `Cobro reserva - ${selected.services.join(', ')}`,
-          amount: selected.total,
+          concept: prev.concept || `Cobro reserva - ${selected.services.join(', ')}`,
         }));
         return;
       }
@@ -49,6 +120,36 @@ function AdminCash() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+
+    setFilters((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      client: '',
+      paymentMethod: '',
+      dateFrom: '',
+      dateTo: '',
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({
+      date: '',
+      client: '',
+      concept: '',
+      paymentMethod: 'Efectivo',
+      amount: '',
+      linkedAppointmentId: '',
+    });
+    setEditingId(null);
   };
 
   const handleSubmit = (e) => {
@@ -61,45 +162,105 @@ function AdminCash() {
       return;
     }
 
-    const newEntry = {
-      id: Date.now(),
-      ...formData,
-      amount: Number(amount),
-    };
+    const numericAmount = Number(amount);
 
-    setCashEntries((prev) => [newEntry, ...prev]);
+    if (editingId) {
+      const updatedCashEntries = cashEntries.map((item) =>
+        item.id === editingId
+          ? {
+              ...item,
+              ...formData,
+              amount: numericAmount,
+            }
+          : item
+      );
 
+      setCashEntries(updatedCashEntries);
+    } else {
+      const newEntry = {
+        id: Date.now(),
+        ...formData,
+        amount: numericAmount,
+      };
+
+      setCashEntries((prev) => [newEntry, ...prev]);
+    }
+
+    resetForm();
+  };
+
+  const handleEdit = (entry) => {
     setFormData({
-      date: '',
-      client: '',
-      concept: '',
-      paymentMethod: 'Efectivo',
-      amount: '',
-      linkedAppointmentId: '',
+      date: entry.date || '',
+      client: entry.client || '',
+      concept: entry.concept || '',
+      paymentMethod: entry.paymentMethod || 'Efectivo',
+      amount: entry.amount || '',
+      linkedAppointmentId: entry.linkedAppointmentId || '',
     });
+    setEditingId(entry.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = (id) => {
     const confirmed = window.confirm('¿Querés eliminar este movimiento de caja?');
     if (!confirmed) return;
 
-    setCashEntries((prev) => prev.filter((item) => item.id !== id));
+    const updatedCashEntries = cashEntries.filter((item) => item.id !== id);
+    setCashEntries(updatedCashEntries);
+
+    if (editingId === id) {
+      resetForm();
+    }
+  };
+
+  const exportCashToExcel = () => {
+    const dataToExport = filteredCashEntries.map((item) => ({
+      Fecha: new Date(`${item.date}T00:00:00`).toLocaleDateString('es-AR'),
+      Cliente: item.client,
+      Concepto: item.concept,
+      'Medio de pago': item.paymentMethod,
+      Monto: Number(item.amount),
+      'Reserva vinculada': item.linkedAppointmentId || '',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Caja');
+
+    const fileName = `caja_autoestetica_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
   };
 
   return (
-    <section className="page-section">
+  <AdminLayout
+    title="Caja interna"
+    subtitle="Registrá cobros y controlá ingresos del taller con filtros y resumen por período."
+  >
       <div className="container py-5">
         <div className="text-center mb-5">
           <h2 className="section-title">Caja interna</h2>
           <p className="section-text">
-            Registrá cobros y llevá un control simple de ingresos del taller.
+            Registrá cobros y controlá ingresos del taller con filtros y resumen por período.
           </p>
         </div>
 
         <div className="row g-4">
           <div className="col-lg-5">
             <div className="content-card">
-              <h4 className="mb-4">Nuevo cobro</h4>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h4 className="mb-0">{editingId ? 'Editar cobro' : 'Nuevo cobro'}</h4>
+                {editingId && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-light btn-sm"
+                    onClick={resetForm}
+                  >
+                    Cancelar edición
+                  </button>
+                )}
+              </div>
 
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
@@ -184,7 +345,7 @@ function AdminCash() {
                 </div>
 
                 <button type="submit" className="btn btn-brand w-100">
-                  Registrar cobro
+                  {editingId ? 'Guardar cambios' : 'Registrar cobro'}
                 </button>
               </form>
             </div>
@@ -192,19 +353,102 @@ function AdminCash() {
 
           <div className="col-lg-7">
             <div className="content-card mb-4">
-              <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <h4 className="mb-0">Resumen de caja</h4>
-                <div className="admin-total-box">
-                  <span className="admin-total-label">Total cobrado:</span>
-                  <span className="admin-total-value">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <h4 className="mb-0">Filtros de caja</h4>
+                <button
+                  type="button"
+                  className="btn btn-outline-light btn-sm"
+                  onClick={clearFilters}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">Cliente</label>
+                  <input
+                    type="text"
+                    name="client"
+                    className="form-control custom-input"
+                    value={filters.client}
+                    onChange={handleFilterChange}
+                    placeholder="Buscar por cliente"
+                  />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Medio de pago</label>
+                  <select
+                    name="paymentMethod"
+                    className="form-select custom-input"
+                    value={filters.paymentMethod}
+                    onChange={handleFilterChange}
+                  >
+                    <option value="">Todos</option>
+                    {paymentMethods.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Desde</label>
+                  <input
+                    type="date"
+                    name="dateFrom"
+                    className="form-control custom-input"
+                    value={filters.dateFrom}
+                    onChange={handleFilterChange}
+                  />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Hasta</label>
+                  <input
+                    type="date"
+                    name="dateTo"
+                    className="form-control custom-input"
+                    value={filters.dateTo}
+                    onChange={handleFilterChange}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="row g-3 mb-4">
+              <div className="col-md-6">
+                <div className="content-card stats-card">
+                  <p className="stats-label">Movimientos filtrados</p>
+                  <h3 className="stats-value">{totalMovements}</h3>
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="content-card stats-card">
+                  <p className="stats-label">Total filtrado</p>
+                  <h3 className="stats-value">
                     ${totalCollected.toLocaleString('es-AR')}
-                  </span>
+                  </h3>
                 </div>
               </div>
             </div>
 
             <div className="content-card">
-              <h4 className="mb-4">Movimientos</h4>
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <h4 className="mb-0">Movimientos</h4>
+
+                <button
+                  type="button"
+                  className="btn btn-brand btn-sm"
+                  onClick={exportCashToExcel}
+                  disabled={filteredCashEntries.length === 0}
+                >
+                  Exportar caja a Excel
+                </button>
+              </div>
 
               <div className="table-responsive">
                 <table className="table table-dark table-hover align-middle agenda-table">
@@ -219,7 +463,7 @@ function AdminCash() {
                     </tr>
                   </thead>
                   <tbody>
-                    {cashEntries.map((item) => (
+                    {filteredCashEntries.map((item) => (
                       <tr key={item.id}>
                         <td>{new Date(`${item.date}T00:00:00`).toLocaleDateString('es-AR')}</td>
                         <td>{item.client}</td>
@@ -227,13 +471,22 @@ function AdminCash() {
                         <td>{item.paymentMethod}</td>
                         <td>${Number(item.amount).toLocaleString('es-AR')}</td>
                         <td>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={() => handleDelete(item.id)}
-                          >
-                            Borrar
-                          </button>
+                          <div className="d-flex gap-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-info"
+                              onClick={() => handleEdit(item)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              Borrar
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -241,14 +494,16 @@ function AdminCash() {
                 </table>
               </div>
 
-              {cashEntries.length === 0 && (
-                <p className="mb-0 text-muted-custom">Todavía no hay movimientos cargados.</p>
+              {filteredCashEntries.length === 0 && (
+                <p className="mb-0 text-muted-custom">
+                  No hay movimientos que coincidan con los filtros.
+                </p>
               )}
             </div>
           </div>
         </div>
       </div>
-    </section>
+      </AdminLayout>
   );
 }
 

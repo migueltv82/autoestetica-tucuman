@@ -10,7 +10,7 @@ import AdminAgenda from './pages/AdminAgenda.jsx';
 import Login from './pages/Login.jsx';
 import AdminStats from './pages/AdminStats.jsx';
 import AdminCash from './pages/AdminCash.jsx';
-
+import AdminDashboard from './pages/AdminDashboard.jsx';
 function App() {
   return (
     <div>
@@ -36,6 +36,14 @@ function App() {
   element={
     <ProtectedRoute>
       <AdminStats />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/dashboard"
+  element={
+    <ProtectedRoute>
+      <AdminDashboard />
     </ProtectedRoute>
   }
 />

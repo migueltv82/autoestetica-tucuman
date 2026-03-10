@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import AdminLayout from '../components/admin/AdminLayout.jsx';
 
 function AdminAgenda() {
   const serviceOptions = {
@@ -36,9 +37,16 @@ function AdminAgenda() {
             shift: 'Mañana',
             status: 'Pendiente',
             paymentStatus: 'Pendiente',
+            paidAmount: 0,
             total: 30000,
+            notes: '',
           },
         ];
+  });
+
+  const [cashEntries, setCashEntries] = useState(() => {
+    const saved = localStorage.getItem('adminCashEntries');
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [formData, setFormData] = useState({
@@ -48,10 +56,11 @@ function AdminAgenda() {
     date: '',
     shift: '',
     status: 'Pendiente',
-    paymentStatus: 'Pendiente',
+    notes: '',
   });
 
   const [editingId, setEditingId] = useState(null);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   const [filters, setFilters] = useState({
     client: '',
@@ -66,12 +75,55 @@ function AdminAgenda() {
     localStorage.setItem('adminAppointments', JSON.stringify(appointments));
   }, [appointments]);
 
+  useEffect(() => {
+    const syncCash = () => {
+      const updatedCashEntries = JSON.parse(localStorage.getItem('adminCashEntries') || '[]');
+      setCashEntries(updatedCashEntries);
+    };
+
+    window.addEventListener('storage', syncCash);
+    syncCash();
+
+    return () => window.removeEventListener('storage', syncCash);
+  }, []);
+
+  const appointmentsWithPayments = useMemo(() => {
+    return appointments.map((appointment) => {
+      const linkedPayments = cashEntries.filter(
+        (entry) => String(entry.linkedAppointmentId) === String(appointment.id)
+      );
+
+      const paidAmount = linkedPayments.reduce(
+        (acc, entry) => acc + Number(entry.amount || 0),
+        0
+      );
+
+      const balance = Math.max(Number(appointment.total || 0) - paidAmount, 0);
+
+      let paymentStatus = 'Pendiente';
+      if (paidAmount > 0 && paidAmount < Number(appointment.total || 0)) {
+        paymentStatus = 'Señado';
+      }
+      if (paidAmount >= Number(appointment.total || 0) && Number(appointment.total || 0) > 0) {
+        paymentStatus = 'Pagado';
+      }
+
+      return {
+        ...appointment,
+        linkedPayments,
+        paidAmount,
+        balance,
+        paymentStatus,
+      };
+    });
+  }, [appointments, cashEntries]);
+
   const availableServices = useMemo(() => {
     return formData.vehicle ? serviceOptions[formData.vehicle] || [] : [];
   }, [formData.vehicle]);
 
   const filteredAppointments = useMemo(() => {
-    return appointments.filter((item) => {
+    return appointmentsWithPayments.filter((item) => {
       const matchesClient = item.client
         .toLowerCase()
         .includes(filters.client.toLowerCase());
@@ -93,7 +145,7 @@ function AdminAgenda() {
         matchesDateTo
       );
     });
-  }, [appointments, filters]);
+  }, [appointmentsWithPayments, filters]);
 
   const groupedAppointments = useMemo(() => {
     const grouped = filteredAppointments.reduce((acc, item) => {
@@ -192,7 +244,7 @@ function AdminAgenda() {
       date: '',
       shift: '',
       status: 'Pendiente',
-      paymentStatus: 'Pendiente',
+      notes: '',
     });
     setEditingId(null);
   };
@@ -200,9 +252,9 @@ function AdminAgenda() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const { client, vehicle, services, date, shift, status, paymentStatus } = formData;
+    const { client, vehicle, services, date, shift, status, notes } = formData;
 
-    if (!client || !vehicle || services.length === 0 || !date || !shift || !status || !paymentStatus) {
+    if (!client || !vehicle || services.length === 0 || !date || !shift || !status) {
       alert('Completá todos los campos y seleccioná al menos un servicio.');
       return;
     }
@@ -216,6 +268,7 @@ function AdminAgenda() {
             ? {
                 ...item,
                 ...formData,
+                notes,
                 total,
               }
             : item
@@ -226,6 +279,8 @@ function AdminAgenda() {
         id: Date.now(),
         ...formData,
         total,
+        paidAmount: 0,
+        notes,
       };
 
       setAppointments((prev) => [...prev, newAppointment]);
@@ -242,7 +297,7 @@ function AdminAgenda() {
       date: appointment.date,
       shift: appointment.shift,
       status: appointment.status,
-      paymentStatus: appointment.paymentStatus || 'Pendiente',
+      notes: appointment.notes || '',
     });
     setEditingId(appointment.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -257,6 +312,9 @@ function AdminAgenda() {
     if (editingId === id) {
       resetForm();
     }
+    if (selectedAppointment?.id === id) {
+      setSelectedAppointment(null);
+    }
   };
 
   const exportToExcel = () => {
@@ -269,6 +327,9 @@ function AdminAgenda() {
       Estado: item.status,
       Pago: item.paymentStatus || 'Pendiente',
       Total: item.total,
+      Pagado: item.paidAmount || 0,
+      Saldo: item.balance || 0,
+      Observaciones: item.notes || '',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -280,10 +341,28 @@ function AdminAgenda() {
     XLSX.writeFile(workbook, fileName);
   };
 
+  const copyReminderMessage = async (item) => {
+    const balance = Math.max(Number(item.total || 0) - Number(item.paidAmount || 0), 0);
+
+    const message = `Hola ${item.client}, te recordamos tu reserva en Autoestética Tucumán.
+Fecha: ${new Date(`${item.date}T00:00:00`).toLocaleDateString('es-AR')}
+Turno: ${item.shift}
+Servicios: ${item.services.join(', ')}
+Estado de pago: ${item.paymentStatus}
+Saldo pendiente: $${balance.toLocaleString('es-AR')}
+Cualquier consulta, estamos a disposición.`;
+
+    await navigator.clipboard.writeText(message);
+    alert('Recordatorio copiado al portapapeles.');
+  };
+
   const currentTotal = calculateTotal(formData.vehicle, formData.services);
 
   return (
-    <section className="page-section">
+  <AdminLayout
+    title="Agenda interna"
+    subtitle="Administrá reservas, servicios, estados, pagos y totales desde un solo lugar."
+  >
       <div className="container py-5">
         <div className="text-center mb-5">
           <h2 className="section-title">Agenda interna</h2>
@@ -404,20 +483,16 @@ function AdminAgenda() {
                   </select>
                 </div>
 
-                <div className="mb-3">
-                  <label className="form-label">Estado de pago</label>
-                  <select
-                    name="paymentStatus"
-                    className="form-select custom-input"
-                    value={formData.paymentStatus}
+                <div className="mb-4">
+                  <label className="form-label">Observaciones internas</label>
+                  <textarea
+                    name="notes"
+                    className="form-control custom-input custom-textarea"
+                    rows="4"
+                    value={formData.notes}
                     onChange={handleChange}
-                  >
-                    {paymentStatuses.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Notas internas de la reserva..."
+                  />
                 </div>
 
                 <div className="admin-total-box mb-4">
@@ -627,10 +702,56 @@ function AdminAgenda() {
                               ))}
                             </div>
 
-                            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                              <strong>${item.total.toLocaleString('es-AR')}</strong>
+                            <div className="payment-summary-row mb-2">
+                              <span>Total: ${Number(item.total || 0).toLocaleString('es-AR')}</span>
+                              <span>Pagado: ${Number(item.paidAmount || 0).toLocaleString('es-AR')}</span>
+                              <span>Saldo: ${Number(item.balance || 0).toLocaleString('es-AR')}</span>
+                            </div>
 
-                              <div className="d-flex gap-2">
+                            {item.notes && (
+                              <div className="reservation-notes-box mb-2">
+                                <strong>Observaciones:</strong> {item.notes}
+                              </div>
+                            )}
+
+                            {item.linkedPayments.length > 0 && (
+                              <div className="payment-history-box mb-2">
+                                <p className="payment-history-title mb-2">
+                                  Historial de pagos ({item.linkedPayments.length})
+                                </p>
+
+                                <div className="payment-history-list">
+                                  {item.linkedPayments.map((payment) => (
+                                    <div key={payment.id} className="payment-history-item">
+                                      <span>
+                                        {new Date(`${payment.date}T00:00:00`).toLocaleDateString('es-AR')}
+                                      </span>
+                                      <span>{payment.paymentMethod}</span>
+                                      <span>${Number(payment.amount).toLocaleString('es-AR')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                              <strong>${Number(item.total || 0).toLocaleString('es-AR')}</strong>
+
+                              <div className="d-flex gap-2 flex-wrap">
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-warning"
+                                  onClick={() => copyReminderMessage(item)}
+                                >
+                                  Recordar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-info"
+                                  onClick={() => setSelectedAppointment(item)}
+                                >
+                                  Ver detalle
+                                </button>
                                 <button
                                   type="button"
                                   className="btn btn-sm btn-outline-info"
@@ -675,6 +796,8 @@ function AdminAgenda() {
                       <th>Estado</th>
                       <th>Pago</th>
                       <th>Total</th>
+                      <th>Pagado</th>
+                      <th>Saldo</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
@@ -704,9 +827,25 @@ function AdminAgenda() {
                             {item.paymentStatus || 'Pendiente'}
                           </span>
                         </td>
-                        <td>${item.total.toLocaleString('es-AR')}</td>
+                        <td>${Number(item.total || 0).toLocaleString('es-AR')}</td>
+                        <td>${Number(item.paidAmount || 0).toLocaleString('es-AR')}</td>
+                        <td>${Number(item.balance || 0).toLocaleString('es-AR')}</td>
                         <td>
-                          <div className="d-flex gap-2">
+                          <div className="d-flex gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-warning"
+                              onClick={() => copyReminderMessage(item)}
+                            >
+                              Recordar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-info"
+                              onClick={() => setSelectedAppointment(item)}
+                            >
+                              Ver detalle
+                            </button>
                             <button
                               type="button"
                               className="btn btn-sm btn-outline-info"
@@ -733,10 +872,64 @@ function AdminAgenda() {
                 <p className="mb-0 text-muted-custom">No hay reservas que coincidan con los filtros.</p>
               )}
             </div>
+
+            {selectedAppointment && (
+              <div className="content-card mt-4">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <h4 className="mb-0">Detalle de reserva</h4>
+                  <button
+                    type="button"
+                    className="btn btn-outline-light btn-sm"
+                    onClick={() => setSelectedAppointment(null)}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <div className="detail-grid">
+                  <div><strong>Cliente:</strong> {selectedAppointment.client}</div>
+                  <div><strong>Vehículo:</strong> {selectedAppointment.vehicle}</div>
+                  <div><strong>Fecha:</strong> {new Date(`${selectedAppointment.date}T00:00:00`).toLocaleDateString('es-AR')}</div>
+                  <div><strong>Turno:</strong> {selectedAppointment.shift}</div>
+                  <div><strong>Estado:</strong> {selectedAppointment.status}</div>
+                  <div><strong>Pago:</strong> {selectedAppointment.paymentStatus}</div>
+                  <div><strong>Total:</strong> ${Number(selectedAppointment.total || 0).toLocaleString('es-AR')}</div>
+                  <div><strong>Pagado:</strong> ${Number(selectedAppointment.paidAmount || 0).toLocaleString('es-AR')}</div>
+                  <div><strong>Saldo:</strong> ${Number(selectedAppointment.balance || 0).toLocaleString('es-AR')}</div>
+                  <div><strong>Servicios:</strong> {selectedAppointment.services.join(', ')}</div>
+                </div>
+
+                {selectedAppointment.notes && (
+                  <div className="reservation-notes-box mt-3">
+                    <strong>Observaciones internas:</strong> {selectedAppointment.notes}
+                  </div>
+                )}
+
+                {selectedAppointment.linkedPayments.length > 0 && (
+                  <div className="payment-history-box mt-3">
+                    <p className="payment-history-title mb-2">
+                      Historial de pagos ({selectedAppointment.linkedPayments.length})
+                    </p>
+
+                    <div className="payment-history-list">
+                      {selectedAppointment.linkedPayments.map((payment) => (
+                        <div key={payment.id} className="payment-history-item">
+                          <span>
+                            {new Date(`${payment.date}T00:00:00`).toLocaleDateString('es-AR')}
+                          </span>
+                          <span>{payment.paymentMethod}</span>
+                          <span>${Number(payment.amount).toLocaleString('es-AR')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </section>
+      </AdminLayout>
   );
 }
 

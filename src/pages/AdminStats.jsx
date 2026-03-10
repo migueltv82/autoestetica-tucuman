@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
+import AdminLayout from '../components/admin/AdminLayout.jsx';
 
 function AdminStats() {
   const appointments = JSON.parse(localStorage.getItem('adminAppointments') || '[]');
@@ -46,7 +47,10 @@ function AdminStats() {
   }, [appointments]);
 
   return (
-    <section className="page-section">
+  <AdminLayout
+    title="Estadísticas internas"
+    subtitle="Visualizá rápidamente el movimiento general de reservas y servicios."
+  >
       <div className="container py-5">
         <div className="text-center mb-5">
           <h2 className="section-title">Estadísticas internas</h2>
@@ -122,7 +126,7 @@ function AdminStats() {
           )}
         </div>
       </div>
-    </section>
+      </AdminLayout>
   );
 }
 
