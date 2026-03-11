@@ -1,20 +1,26 @@
-import { Routes, Route } from 'react-router-dom';
-import Navbar from './Components/layout/Navbar.jsx';
-import Footer from './Components/layout/Footer.jsx';
-import ProtectedRoute from './Components/ProtectedRoute.jsx';
+import { Routes, Route, useLocation } from 'react-router-dom';
+import Navbar from './components/layout/Navbar.jsx';
+import Footer from './components/layout/Footer.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Home from './pages/Home.jsx';
 import Services from './pages/Services.jsx';
 import Booking from './pages/Booking.jsx';
 import Contact from './pages/Contact.jsx';
 import AdminAgenda from './pages/AdminAgenda.jsx';
-import Login from './pages/Login.jsx';
 import AdminStats from './pages/AdminStats.jsx';
 import AdminCash from './pages/AdminCash.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import Login from './pages/Login.jsx';
+
 function App() {
+  const location = useLocation();
+
+  const adminRoutes = ['/dashboard', '/agenda', '/estadisticas', '/caja'];
+  const isAdminPage = adminRoutes.includes(location.pathname);
+
   return (
     <div>
-      <Navbar />
+      {!isAdminPage && <Navbar />}
 
       <main>
         <Routes>
@@ -23,6 +29,16 @@ function App() {
           <Route path="/reservas" element={<Booking />} />
           <Route path="/contacto" element={<Contact />} />
           <Route path="/login" element={<Login />} />
+
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/agenda"
             element={
@@ -31,34 +47,28 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
-  path="/estadisticas"
-  element={
-    <ProtectedRoute>
-      <AdminStats />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/dashboard"
-  element={
-    <ProtectedRoute>
-      <AdminDashboard />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/caja"
-  element={
-    <ProtectedRoute>
-      <AdminCash />
-    </ProtectedRoute>
-  }
-/>
+            path="/estadisticas"
+            element={
+              <ProtectedRoute>
+                <AdminStats />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/caja"
+            element={
+              <ProtectedRoute>
+                <AdminCash />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </main>
 
-      <Footer />
+      {!isAdminPage && <Footer />}
     </div>
   );
 }
