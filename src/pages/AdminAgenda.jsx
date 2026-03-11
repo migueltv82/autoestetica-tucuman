@@ -692,7 +692,15 @@ Cualquier consulta, estamos a disposición.`;
 
                     <div className="calendar-day-list">
                       {group.items.map((item) => (
-                        <div key={item.id} className="calendar-appointment-card">
+                        <div
+                        key={item.id}
+                        className={`calendar-appointment-card
+                          ${item.date === new Date().toISOString().split('T')[0] ? 'appointment-today' : ''}
+                          ${Number(item.balance || 0) > 0 ? 'appointment-pending-balance' : ''}
+                          ${item.status === 'Confirmado' ? 'appointment-confirmed' : ''}
+                          ${item.status === 'Finalizado' ? 'appointment-finished' : ''}
+                        `}
+                      >
                           <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
                             <div>
                               <h6 className="mb-1">{item.client}</h6>
@@ -722,6 +730,23 @@ Cualquier consulta, estamos a disposición.`;
                               </span>
                             ))}
                           </div>
+                          <div className="appointment-priority-tags mb-2">
+  {item.date === new Date().toISOString().split('T')[0] && (
+    <span className="priority-tag today-tag">Hoy</span>
+  )}
+
+  {Number(item.balance || 0) > 0 && (
+    <span className="priority-tag balance-tag">Saldo pendiente</span>
+  )}
+
+  {item.status === 'Confirmado' && (
+    <span className="priority-tag confirmed-tag">Confirmada</span>
+  )}
+
+  {item.status === 'Finalizado' && (
+    <span className="priority-tag finished-tag">Finalizada</span>
+  )}
+</div>
 
                           <div className="payment-summary-row mb-2">
                             <span>Total: ${Number(item.total || 0).toLocaleString('es-AR')}</span>
@@ -824,7 +849,13 @@ Cualquier consulta, estamos a disposición.`;
                 </thead>
                 <tbody>
                   {filteredAppointments.map((item) => (
-                    <tr key={item.id}>
+                    <tr
+                    key={item.id}
+                    className={`
+                      ${item.date === new Date().toISOString().split('T')[0] ? 'row-today' : ''}
+                      ${Number(item.balance || 0) > 0 ? 'row-pending-balance' : ''}
+                    `}
+                  >
                       <td>{item.client}</td>
                       <td>{item.vehicle}</td>
                       <td>

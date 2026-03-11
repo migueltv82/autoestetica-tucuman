@@ -4106,3 +4106,95 @@ body.theme-light .dashboard-alert-card {
     justify-content: center;
   }
 }
+/* =========================
+   AGENDA PRIORIDADES VISUALES
+========================= */
+
+.appointment-priority-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.priority-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.today-tag {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+}
+
+.balance-tag {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+}
+
+.confirmed-tag {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+}
+
+.finished-tag {
+  background: rgba(139, 92, 246, 0.16);
+  color: #c4b5fd;
+}
+
+.calendar-appointment-card.appointment-today {
+  border-left: 4px solid #60a5fa;
+}
+
+.calendar-appointment-card.appointment-pending-balance {
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.18), var(--shadow-sm);
+}
+
+.calendar-appointment-card.appointment-confirmed {
+  background: linear-gradient(
+    145deg,
+    rgba(16, 185, 129, 0.06),
+    rgba(255, 255, 255, 0.03)
+  );
+}
+
+.calendar-appointment-card.appointment-finished {
+  background: linear-gradient(
+    145deg,
+    rgba(139, 92, 246, 0.06),
+    rgba(255, 255, 255, 0.03)
+  );
+}
+
+.agenda-table tbody tr.row-today td:first-child {
+  border-left: 4px solid #60a5fa;
+}
+
+.agenda-table tbody tr.row-pending-balance {
+  background: rgba(245, 158, 11, 0.05) !important;
+}
+
+body.theme-light .calendar-appointment-card.appointment-confirmed {
+  background: linear-gradient(
+    145deg,
+    rgba(16, 185, 129, 0.08),
+    rgba(255, 255, 255, 0.9)
+  );
+}
+
+body.theme-light .calendar-appointment-card.appointment-finished {
+  background: linear-gradient(
+    145deg,
+    rgba(139, 92, 246, 0.08),
+    rgba(255, 255, 255, 0.9)
+  );
+}
+
+body.theme-light .agenda-table tbody tr.row-pending-balance {
+  background: rgba(245, 158, 11, 0.08) !important;
+}
