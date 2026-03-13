@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
 
 function AdminAgenda() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const serviceOptions = {
@@ -70,6 +71,8 @@ function AdminAgenda() {
     vehicle: '',
     status: '',
     paymentStatus: '',
+    onlyPendingBalance: false,
+    onlyToday: false,
     dateFrom: '',
     dateTo: '',
   });
@@ -139,6 +142,8 @@ function AdminAgenda() {
     return formData.vehicle ? serviceOptions[formData.vehicle] || [] : [];
   }, [formData.vehicle]);
 
+  const todayDate = new Date().toISOString().split('T')[0];
+
   const filteredAppointments = useMemo(() => {
     return appointmentsWithPayments.filter((item) => {
       const matchesClient = item.client
@@ -150,6 +155,10 @@ function AdminAgenda() {
       const matchesPaymentStatus = filters.paymentStatus
         ? item.paymentStatus === filters.paymentStatus
         : true;
+      const matchesOnlyPendingBalance = filters.onlyPendingBalance
+        ? Number(item.balance || 0) > 0
+        : true;
+      const matchesOnlyToday = filters.onlyToday ? item.date === todayDate : true;
       const matchesDateFrom = filters.dateFrom ? item.date >= filters.dateFrom : true;
       const matchesDateTo = filters.dateTo ? item.date <= filters.dateTo : true;
 
@@ -158,11 +167,13 @@ function AdminAgenda() {
         matchesVehicle &&
         matchesStatus &&
         matchesPaymentStatus &&
+        matchesOnlyPendingBalance &&
+        matchesOnlyToday &&
         matchesDateFrom &&
         matchesDateTo
       );
     });
-  }, [appointmentsWithPayments, filters]);
+  }, [appointmentsWithPayments, filters, todayDate]);
 
   const groupedAppointments = useMemo(() => {
     const grouped = filteredAppointments.reduce((acc, item) => {
@@ -196,6 +207,27 @@ function AdminAgenda() {
       totalServices,
     };
   }, [filteredAppointments]);
+
+  const agendaQuickSummary = useMemo(() => {
+    const todayAppointments = appointmentsWithPayments.filter(
+      (item) => item.date === todayDate
+    );
+
+    const todayPendingAppointments = todayAppointments.filter(
+      (item) => Number(item.balance || 0) > 0
+    );
+
+    const totalPendingToday = todayAppointments.reduce(
+      (acc, item) => acc + Number(item.balance || 0),
+      0
+    );
+
+    return {
+      todayAppointments: todayAppointments.length,
+      todayPendingAppointments: todayPendingAppointments.length,
+      totalPendingToday,
+    };
+  }, [appointmentsWithPayments, todayDate]);
 
   const calculateTotal = (vehicle, selectedServices) => {
     const vehicleServices = serviceOptions[vehicle] || [];
@@ -237,11 +269,11 @@ function AdminAgenda() {
   };
 
   const handleFilterChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
 
     setFilters((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -251,6 +283,8 @@ function AdminAgenda() {
       vehicle: '',
       status: '',
       paymentStatus: '',
+      onlyPendingBalance: false,
+      onlyToday: false,
       dateFrom: '',
       dateTo: '',
     });
@@ -339,6 +373,10 @@ function AdminAgenda() {
     }
   };
 
+  const handleGoToCash = (item) => {
+    navigate(`/caja?appointmentId=${item.id}`);
+  };
+
   const exportToExcel = () => {
     const dataToExport = filteredAppointments.map((item) => ({
       Cliente: item.client,
@@ -388,6 +426,34 @@ Cualquier consulta, estamos a disposición.`;
       title="Agenda interna"
       subtitle="Administrá reservas, servicios, estados, pagos y totales desde un solo lugar."
     >
+      <div className="row g-3 mb-4">
+        <div className="col-md-4">
+          <div className="content-card stats-card admin-kpi-card">
+            <p className="stats-label">Turnos de hoy</p>
+            <h3 className="stats-value">{agendaQuickSummary.todayAppointments}</h3>
+            <span className="admin-kpi-helper">Agenda del día</span>
+          </div>
+        </div>
+
+        <div className="col-md-4">
+          <div className="content-card stats-card admin-kpi-card">
+            <p className="stats-label">Turnos con saldo hoy</p>
+            <h3 className="stats-value">{agendaQuickSummary.todayPendingAppointments}</h3>
+            <span className="admin-kpi-helper">Con deuda pendiente</span>
+          </div>
+        </div>
+
+        <div className="col-md-4">
+          <div className="content-card stats-card admin-kpi-card">
+            <p className="stats-label">Pendiente de hoy</p>
+            <h3 className="stats-value">
+              ${agendaQuickSummary.totalPendingToday.toLocaleString('es-AR')}
+            </h3>
+            <span className="admin-kpi-helper">Saldo acumulado</span>
+          </div>
+        </div>
+      </div>
+
       <div className="row g-4">
         <div className="col-lg-5">
           <div className="content-card">
@@ -603,7 +669,32 @@ Cualquier consulta, estamos a disposición.`;
                 </select>
               </div>
 
-              <div className="col-md-2">
+              <div className="col-md-4">
+                <label className="form-label">Prioridad</label>
+                <div className="quick-filter-check quick-filter-stack">
+                  <label className="service-check-item quick-check-item">
+                    <input
+                      type="checkbox"
+                      name="onlyPendingBalance"
+                      checked={filters.onlyPendingBalance}
+                      onChange={handleFilterChange}
+                    />
+                    <span>Solo con saldo pendiente</span>
+                  </label>
+
+                  <label className="service-check-item quick-check-item">
+                    <input
+                      type="checkbox"
+                      name="onlyToday"
+                      checked={filters.onlyToday}
+                      onChange={handleFilterChange}
+                    />
+                    <span>Solo de hoy</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="col-md-6">
                 <label className="form-label">Desde</label>
                 <input
                   type="date"
@@ -614,7 +705,7 @@ Cualquier consulta, estamos a disposición.`;
                 />
               </div>
 
-              <div className="col-md-2">
+              <div className="col-md-6">
                 <label className="form-label">Hasta</label>
                 <input
                   type="date"
@@ -693,14 +784,14 @@ Cualquier consulta, estamos a disposición.`;
                     <div className="calendar-day-list">
                       {group.items.map((item) => (
                         <div
-                        key={item.id}
-                        className={`calendar-appointment-card
-                          ${item.date === new Date().toISOString().split('T')[0] ? 'appointment-today' : ''}
-                          ${Number(item.balance || 0) > 0 ? 'appointment-pending-balance' : ''}
-                          ${item.status === 'Confirmado' ? 'appointment-confirmed' : ''}
-                          ${item.status === 'Finalizado' ? 'appointment-finished' : ''}
-                        `}
-                      >
+                          key={item.id}
+                          className={`calendar-appointment-card
+                            ${item.date === todayDate ? 'appointment-today' : ''}
+                            ${Number(item.balance || 0) > 0 ? 'appointment-pending-balance' : ''}
+                            ${item.status === 'Confirmado' ? 'appointment-confirmed' : ''}
+                            ${item.status === 'Finalizado' ? 'appointment-finished' : ''}
+                          `}
+                        >
                           <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
                             <div>
                               <h6 className="mb-1">{item.client}</h6>
@@ -730,23 +821,24 @@ Cualquier consulta, estamos a disposición.`;
                               </span>
                             ))}
                           </div>
+
                           <div className="appointment-priority-tags mb-2">
-  {item.date === new Date().toISOString().split('T')[0] && (
-    <span className="priority-tag today-tag">Hoy</span>
-  )}
+                            {item.date === todayDate && (
+                              <span className="priority-tag today-tag">Hoy</span>
+                            )}
 
-  {Number(item.balance || 0) > 0 && (
-    <span className="priority-tag balance-tag">Saldo pendiente</span>
-  )}
+                            {Number(item.balance || 0) > 0 && (
+                              <span className="priority-tag balance-tag">Saldo pendiente</span>
+                            )}
 
-  {item.status === 'Confirmado' && (
-    <span className="priority-tag confirmed-tag">Confirmada</span>
-  )}
+                            {item.status === 'Confirmado' && (
+                              <span className="priority-tag confirmed-tag">Confirmada</span>
+                            )}
 
-  {item.status === 'Finalizado' && (
-    <span className="priority-tag finished-tag">Finalizada</span>
-  )}
-</div>
+                            {item.status === 'Finalizado' && (
+                              <span className="priority-tag finished-tag">Finalizada</span>
+                            )}
+                          </div>
 
                           <div className="payment-summary-row mb-2">
                             <span>Total: ${Number(item.total || 0).toLocaleString('es-AR')}</span>
@@ -790,6 +882,13 @@ Cualquier consulta, estamos a disposición.`;
                                 onClick={() => copyReminderMessage(item)}
                               >
                                 Recordar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-success"
+                                onClick={() => handleGoToCash(item)}
+                              >
+                                Registrar cobro
                               </button>
                               <button
                                 type="button"
@@ -850,12 +949,12 @@ Cualquier consulta, estamos a disposición.`;
                 <tbody>
                   {filteredAppointments.map((item) => (
                     <tr
-                    key={item.id}
-                    className={`
-                      ${item.date === new Date().toISOString().split('T')[0] ? 'row-today' : ''}
-                      ${Number(item.balance || 0) > 0 ? 'row-pending-balance' : ''}
-                    `}
-                  >
+                      key={item.id}
+                      className={`
+                        ${item.date === todayDate ? 'row-today' : ''}
+                        ${Number(item.balance || 0) > 0 ? 'row-pending-balance' : ''}
+                      `}
+                    >
                       <td>{item.client}</td>
                       <td>{item.vehicle}</td>
                       <td>
@@ -894,6 +993,13 @@ Cualquier consulta, estamos a disposición.`;
                             onClick={() => copyReminderMessage(item)}
                           >
                             Recordar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleGoToCash(item)}
+                          >
+                            Registrar cobro
                           </button>
                           <button
                             type="button"

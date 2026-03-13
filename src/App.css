@@ -4198,3 +4198,179 @@ body.theme-light .calendar-appointment-card.appointment-finished {
 body.theme-light .agenda-table tbody tr.row-pending-balance {
   background: rgba(245, 158, 11, 0.08) !important;
 }
+.cash-linked-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(0, 191, 166, 0.08);
+  border: 1px solid rgba(0, 191, 166, 0.18);
+}
+
+.cash-linked-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  color: var(--text-soft);
+}
+
+.cash-linked-item strong {
+  color: var(--text-main);
+}
+
+body.theme-light .cash-linked-summary {
+  background: rgba(0, 191, 166, 0.07);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+.btn-outline-success {
+  border-radius: 12px;
+  font-weight: 700;
+  transition: var(--transition-soft);
+}
+
+.btn-outline-success:hover {
+  transform: translateY(-1px);
+}
+
+.cash-linked-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(0, 191, 166, 0.08);
+  border: 1px solid rgba(0, 191, 166, 0.18);
+}
+
+.cash-linked-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  color: var(--text-soft);
+}
+
+.cash-linked-item strong {
+  color: var(--text-main);
+}
+
+body.theme-light .cash-linked-summary {
+  background: rgba(0, 191, 166, 0.07);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+.cash-payment-history-box {
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cash-payment-history-box h5 {
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.cash-payment-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.cash-payment-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.cash-payment-history-right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.cash-payment-history-right strong {
+  color: var(--text-main);
+}
+
+.cash-payment-history-right span {
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
+body.theme-light .cash-payment-history-box,
+body.theme-light .cash-payment-history-item {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+@media (max-width: 767px) {
+  .cash-payment-history-item {
+    flex-direction: column;
+  }
+
+  .cash-payment-history-right {
+    text-align: left;
+  }
+}
+.quick-filter-check {
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+}
+
+.quick-check-item {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.quick-check-item span {
+  font-weight: 700;
+}
+.quick-filter-check {
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+}
+
+.quick-filter-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.6rem;
+}
+
+.quick-check-item {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.quick-check-item span {
+  font-weight: 700;
+}
+.quick-filter-check {
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+}
+
+.quick-filter-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.6rem;
+}
+
+.quick-check-item {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.quick-check-item span {
+  font-weight: 700;
+}
