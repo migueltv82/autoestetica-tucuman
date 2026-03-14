@@ -10,12 +10,13 @@ import AdminAgenda from './pages/AdminAgenda.jsx';
 import AdminStats from './pages/AdminStats.jsx';
 import AdminCash from './pages/AdminCash.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import AdminClients from './pages/AdminClients.jsx';
 import Login from './pages/Login.jsx';
 
 function App() {
   const location = useLocation();
 
-  const adminRoutes = ['/dashboard', '/agenda', '/estadisticas', '/caja'];
+  const adminRoutes = ['/dashboard', '/agenda', '/estadisticas', '/caja', '/clientes'];
   const isAdminPage = adminRoutes.includes(location.pathname);
 
   return (
@@ -62,6 +63,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminCash />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/clientes"
+            element={
+              <ProtectedRoute>
+                <AdminClients />
               </ProtectedRoute>
             }
           />

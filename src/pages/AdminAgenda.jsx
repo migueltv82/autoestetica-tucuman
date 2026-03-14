@@ -35,6 +35,7 @@ function AdminAgenda() {
           {
             id: 1,
             client: 'Juan Pérez',
+            phone: '',
             vehicle: 'Auto',
             services: ['Limpieza de interior', 'Lavado de motor'],
             date: '2026-03-10',
@@ -55,6 +56,7 @@ function AdminAgenda() {
 
   const [formData, setFormData] = useState({
     client: '',
+    phone: '',
     vehicle: '',
     services: [],
     date: '',
@@ -103,6 +105,36 @@ function AdminAgenda() {
       client: clientFromUrl,
     }));
   }, [searchParams]);
+
+  const clientSuggestions = useMemo(() => {
+    const map = new Map();
+
+    appointments.forEach((item) => {
+      const name = (item.client || '').trim();
+      const phone = (item.phone || '').trim();
+
+      if (!name) return;
+
+      if (!map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), {
+          client: name,
+          phone,
+        });
+      } else {
+        const existing = map.get(name.toLowerCase());
+        if (!existing.phone && phone) {
+          map.set(name.toLowerCase(), {
+            client: name,
+            phone,
+          });
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.client.localeCompare(b.client)
+    );
+  }, [appointments]);
 
   const appointmentsWithPayments = useMemo(() => {
     return appointments.map((appointment) => {
@@ -237,6 +269,58 @@ function AdminAgenda() {
     }, 0);
   };
 
+  const normalizePhoneForWa = (phone) => {
+    if (!phone) return '';
+    return phone.replace(/\D/g, '');
+  };
+
+  const buildReminderMessage = (item) => {
+    const balance = Math.max(
+      Number(item.total || 0) - Number(item.paidAmount || 0),
+      0
+    );
+
+    return `Hola ${item.client}, te recordamos tu reserva en Autoestética Tucumán.
+Fecha: ${new Date(`${item.date}T00:00:00`).toLocaleDateString('es-AR')}
+Turno: ${item.shift}
+Vehículo: ${item.vehicle}
+Servicios: ${item.services.join(', ')}
+Estado de pago: ${item.paymentStatus}
+Saldo pendiente: $${balance.toLocaleString('es-AR')}
+Cualquier consulta, estamos a disposición.`;
+  };
+
+  const openWhatsAppReminder = (item) => {
+    const message = buildReminderMessage(item);
+    const cleanPhone = normalizePhoneForWa(item.phone);
+
+    const url = cleanPhone
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+    window.open(url, '_blank');
+  };
+
+  const copyReminderMessage = async (item) => {
+    const message = buildReminderMessage(item);
+    await navigator.clipboard.writeText(message);
+    alert('Recordatorio copiado al portapapeles.');
+  };
+
+  const applyClientAutocomplete = (typedName) => {
+    const match = clientSuggestions.find(
+      (item) => item.client.toLowerCase() === typedName.trim().toLowerCase()
+    );
+
+    if (!match) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      client: match.client,
+      phone: prev.phone || match.phone || '',
+    }));
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -253,6 +337,21 @@ function AdminAgenda() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleClientBlur = () => {
+    applyClientAutocomplete(formData.client);
+  };
+
+  const handleClientSuggestionChange = (e) => {
+    const value = e.target.value;
+
+    setFormData((prev) => ({
+      ...prev,
+      client: value,
+    }));
+
+    applyClientAutocomplete(value);
   };
 
   const handleServiceToggle = (serviceName) => {
@@ -295,6 +394,7 @@ function AdminAgenda() {
   const resetForm = () => {
     setFormData({
       client: '',
+      phone: '',
       vehicle: '',
       services: [],
       date: '',
@@ -308,10 +408,10 @@ function AdminAgenda() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const { client, vehicle, services, date, shift, status, notes } = formData;
+    const { client, phone, vehicle, services, date, shift, status, notes } = formData;
 
     if (!client || !vehicle || services.length === 0 || !date || !shift || !status) {
-      alert('Completá todos los campos y seleccioná al menos un servicio.');
+      alert('Completá todos los campos obligatorios y seleccioná al menos un servicio.');
       return;
     }
 
@@ -324,6 +424,7 @@ function AdminAgenda() {
             ? {
                 ...item,
                 ...formData,
+                phone,
                 notes,
                 total,
               }
@@ -334,6 +435,7 @@ function AdminAgenda() {
       const newAppointment = {
         id: Date.now(),
         ...formData,
+        phone,
         total,
         paidAmount: 0,
         notes,
@@ -348,6 +450,7 @@ function AdminAgenda() {
   const handleEdit = (appointment) => {
     setFormData({
       client: appointment.client,
+      phone: appointment.phone || '',
       vehicle: appointment.vehicle,
       services: appointment.services,
       date: appointment.date,
@@ -380,6 +483,7 @@ function AdminAgenda() {
   const exportToExcel = () => {
     const dataToExport = filteredAppointments.map((item) => ({
       Cliente: item.client,
+      Teléfono: item.phone || '',
       Vehículo: item.vehicle,
       Servicios: item.services.join(', '),
       Fecha: new Date(`${item.date}T00:00:00`).toLocaleDateString('es-AR'),
@@ -399,24 +503,6 @@ function AdminAgenda() {
 
     const fileName = `agenda_autoestetica_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(workbook, fileName);
-  };
-
-  const copyReminderMessage = async (item) => {
-    const balance = Math.max(
-      Number(item.total || 0) - Number(item.paidAmount || 0),
-      0
-    );
-
-    const message = `Hola ${item.client}, te recordamos tu reserva en Autoestética Tucumán.
-Fecha: ${new Date(`${item.date}T00:00:00`).toLocaleDateString('es-AR')}
-Turno: ${item.shift}
-Servicios: ${item.services.join(', ')}
-Estado de pago: ${item.paymentStatus}
-Saldo pendiente: $${balance.toLocaleString('es-AR')}
-Cualquier consulta, estamos a disposición.`;
-
-    await navigator.clipboard.writeText(message);
-    alert('Recordatorio copiado al portapapeles.');
   };
 
   const currentTotal = calculateTotal(formData.vehicle, formData.services);
@@ -476,10 +562,29 @@ Cualquier consulta, estamos a disposición.`;
                 <input
                   type="text"
                   name="client"
+                  list="client-suggestions"
                   className="form-control custom-input"
                   value={formData.client}
-                  onChange={handleChange}
+                  onChange={handleClientSuggestionChange}
+                  onBlur={handleClientBlur}
                   placeholder="Ej: Juan Pérez"
+                />
+                <datalist id="client-suggestions">
+                  {clientSuggestions.map((item) => (
+                    <option key={item.client} value={item.client} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label">Teléfono</label>
+                <input
+                  type="text"
+                  name="phone"
+                  className="form-control custom-input"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="Ej: 5493811234567"
                 />
               </div>
 
@@ -798,6 +903,11 @@ Cualquier consulta, estamos a disposición.`;
                               <p className="mb-0 text-muted-custom">
                                 {item.vehicle} · {item.shift}
                               </p>
+                              {item.phone && (
+                                <p className="mb-0 text-muted-custom">
+                                  {item.phone}
+                                </p>
+                              )}
                             </div>
 
                             <div className="d-flex flex-wrap gap-2">
@@ -878,10 +988,17 @@ Cualquier consulta, estamos a disposición.`;
                             <div className="d-flex gap-2 flex-wrap">
                               <button
                                 type="button"
+                                className="btn btn-sm btn-outline-success"
+                                onClick={() => openWhatsAppReminder(item)}
+                              >
+                                WhatsApp
+                              </button>
+                              <button
+                                type="button"
                                 className="btn btn-sm btn-outline-warning"
                                 onClick={() => copyReminderMessage(item)}
                               >
-                                Recordar
+                                Copiar
                               </button>
                               <button
                                 type="button"
@@ -934,6 +1051,7 @@ Cualquier consulta, estamos a disposición.`;
                 <thead>
                   <tr>
                     <th>Cliente</th>
+                    <th>Teléfono</th>
                     <th>Vehículo</th>
                     <th>Servicios</th>
                     <th>Fecha</th>
@@ -956,6 +1074,7 @@ Cualquier consulta, estamos a disposición.`;
                       `}
                     >
                       <td>{item.client}</td>
+                      <td>{item.phone || '-'}</td>
                       <td>{item.vehicle}</td>
                       <td>
                         <div className="services-list-cell">
@@ -989,10 +1108,17 @@ Cualquier consulta, estamos a disposición.`;
                         <div className="d-flex gap-2 flex-wrap">
                           <button
                             type="button"
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => openWhatsAppReminder(item)}
+                          >
+                            WhatsApp
+                          </button>
+                          <button
+                            type="button"
                             className="btn btn-sm btn-outline-warning"
                             onClick={() => copyReminderMessage(item)}
                           >
-                            Recordar
+                            Copiar
                           </button>
                           <button
                             type="button"
@@ -1052,6 +1178,7 @@ Cualquier consulta, estamos a disposición.`;
 
               <div className="detail-grid">
                 <div><strong>Cliente:</strong> {selectedAppointment.client}</div>
+                <div><strong>Teléfono:</strong> {selectedAppointment.phone || '-'}</div>
                 <div><strong>Vehículo:</strong> {selectedAppointment.vehicle}</div>
                 <div>
                   <strong>Fecha:</strong>{' '}

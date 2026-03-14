@@ -68,6 +68,11 @@ function AdminLayout({ title, subtitle, children }) {
                 {!collapsed && <span>Agenda</span>}
               </NavLink>
 
+              <NavLink to="/clientes" className="admin-sidebar-link">
+                <i className="bi bi-people"></i>
+                {!collapsed && <span>Clientes</span>}
+              </NavLink>
+
               <NavLink to="/estadisticas" className="admin-sidebar-link">
                 <i className="bi bi-bar-chart-line"></i>
                 {!collapsed && <span>Estadísticas</span>}
@@ -90,7 +95,7 @@ function AdminLayout({ title, subtitle, children }) {
               </button>
 
               <a
-                href="https://wa.me/5493815448147"
+                href="https://wa.me/"
                 target="_blank"
                 rel="noreferrer"
                 className="admin-sidebar-action"
@@ -126,7 +131,7 @@ function AdminLayout({ title, subtitle, children }) {
 
               <div className="admin-topbar-actions">
                 <a
-                  href="https://wa.me/5493815448147"
+                  href="https://wa.me/"
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-outline-light admin-topbar-btn"

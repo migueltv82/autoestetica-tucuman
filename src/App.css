@@ -4374,3 +4374,125 @@ body.theme-light .cash-payment-history-item {
 .quick-check-item span {
   font-weight: 700;
 }
+.quick-filter-check {
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+}
+
+.quick-filter-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.6rem;
+}
+
+.quick-check-item {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.quick-check-item span {
+  font-weight: 700;
+}
+.clients-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.client-card {
+  padding: 1.1rem;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.client-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.client-card-header h4 {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.client-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.client-stat-box {
+  padding: 0.8rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.client-stat-box span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.client-stat-box strong {
+  color: var(--text-main);
+  font-size: 0.98rem;
+}
+
+.client-card-section {
+  margin-bottom: 0.9rem;
+}
+
+.client-card-label {
+  margin-bottom: 0.45rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.client-card-footer {
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.clients-counter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 50px;
+  width: 100%;
+}
+
+body.theme-light .client-card,
+body.theme-light .client-stat-box {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+body.theme-light .client-card-footer {
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+@media (max-width: 991px) {
+  .clients-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .client-card-stats {
+    grid-template-columns: 1fr;
+  }
+}
