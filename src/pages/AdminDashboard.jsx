@@ -23,8 +23,7 @@ function AdminAgenda() {
   };
 
   const vehicles = ['Auto', 'Camioneta', 'Moto', 'Bicicleta'];
-  const shifts = ['Mañana', 'Tarde'];
-  const statuses = ['Pendiente', 'Confirmado', 'Finalizado', 'Cancelado'];
+  const statuses = ['Pendiente', 'Confirmado', 'En proceso', 'Finalizado', 'Cancelado'];
   const paymentStatuses = ['Pendiente', 'Señado', 'Pagado'];
 
   const [appointments, setAppointments] = useState(() => {
@@ -38,8 +37,8 @@ function AdminAgenda() {
             phone: '',
             vehicle: 'Auto',
             services: ['Limpieza de interior', 'Lavado de motor'],
-            date: '2026-03-10',
-            shift: 'Mañana',
+            startDate: '2026-03-10',
+            endDate: '2026-03-11',
             status: 'Pendiente',
             paymentStatus: 'Pendiente',
             paidAmount: 0,
@@ -59,8 +58,8 @@ function AdminAgenda() {
     phone: '',
     vehicle: '',
     services: [],
-    date: '',
-    shift: '',
+    startDate: '',
+    endDate: '',
     status: 'Pendiente',
     notes: '',
   });
@@ -75,8 +74,8 @@ function AdminAgenda() {
     paymentStatus: '',
     onlyPendingBalance: false,
     onlyToday: false,
-    dateFrom: '',
-    dateTo: '',
+    filterFrom: '',
+    filterTo: '',
   });
 
   useEffect(() => {
@@ -105,6 +104,53 @@ function AdminAgenda() {
       client: clientFromUrl,
     }));
   }, [searchParams]);
+
+  const clientSuggestions = useMemo(() => {
+    const map = new Map();
+
+    appointments.forEach((item) => {
+      const name = (item.client || '').trim();
+      const phone = (item.phone || '').trim();
+
+      if (!name) return;
+
+      if (!map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), {
+          client: name,
+          phone,
+        });
+      } else {
+        const existing = map.get(name.toLowerCase());
+        if (!existing.phone && phone) {
+          map.set(name.toLowerCase(), {
+            client: name,
+            phone,
+          });
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.client.localeCompare(b.client)
+    );
+  }, [appointments]);
+
+  const todayDate = new Date().toISOString().split('T')[0];
+
+  const isDateInRange = (date, startDate, endDate) => {
+    if (!startDate) return false;
+    const end = endDate || startDate;
+    return date >= startDate && date <= end;
+  };
+
+  const doesRangeOverlap = (itemStart, itemEnd, filterFrom, filterTo) => {
+    const start = itemStart;
+    const end = itemEnd || itemStart;
+
+    if (filterFrom && end < filterFrom) return false;
+    if (filterTo && start > filterTo) return false;
+    return true;
+  };
 
   const appointmentsWithPayments = useMemo(() => {
     return appointments.map((appointment) => {
@@ -144,8 +190,6 @@ function AdminAgenda() {
     return formData.vehicle ? serviceOptions[formData.vehicle] || [] : [];
   }, [formData.vehicle]);
 
-  const todayDate = new Date().toISOString().split('T')[0];
-
   const filteredAppointments = useMemo(() => {
     return appointmentsWithPayments.filter((item) => {
       const matchesClient = item.client
@@ -160,9 +204,16 @@ function AdminAgenda() {
       const matchesOnlyPendingBalance = filters.onlyPendingBalance
         ? Number(item.balance || 0) > 0
         : true;
-      const matchesOnlyToday = filters.onlyToday ? item.date === todayDate : true;
-      const matchesDateFrom = filters.dateFrom ? item.date >= filters.dateFrom : true;
-      const matchesDateTo = filters.dateTo ? item.date <= filters.dateTo : true;
+      const matchesOnlyToday = filters.onlyToday
+        ? isDateInRange(todayDate, item.startDate, item.endDate)
+        : true;
+
+      const matchesDateRange = doesRangeOverlap(
+        item.startDate,
+        item.endDate,
+        filters.filterFrom,
+        filters.filterTo
+      );
 
       return (
         matchesClient &&
@@ -171,16 +222,16 @@ function AdminAgenda() {
         matchesPaymentStatus &&
         matchesOnlyPendingBalance &&
         matchesOnlyToday &&
-        matchesDateFrom &&
-        matchesDateTo
+        matchesDateRange
       );
     });
   }, [appointmentsWithPayments, filters, todayDate]);
 
   const groupedAppointments = useMemo(() => {
     const grouped = filteredAppointments.reduce((acc, item) => {
-      if (!acc[item.date]) acc[item.date] = [];
-      acc[item.date].push(item);
+      const key = item.startDate || 'Sin fecha';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
       return acc;
     }, {});
 
@@ -188,7 +239,7 @@ function AdminAgenda() {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, items]) => ({
         date,
-        items: items.sort((a, b) => a.shift.localeCompare(b.shift)),
+        items: items.sort((a, b) => (a.endDate || a.startDate).localeCompare(b.endDate || b.startDate)),
       }));
   }, [filteredAppointments]);
 
@@ -211,8 +262,8 @@ function AdminAgenda() {
   }, [filteredAppointments]);
 
   const agendaQuickSummary = useMemo(() => {
-    const todayAppointments = appointmentsWithPayments.filter(
-      (item) => item.date === todayDate
+    const todayAppointments = appointmentsWithPayments.filter((item) =>
+      isDateInRange(todayDate, item.startDate, item.endDate)
     );
 
     const todayPendingAppointments = todayAppointments.filter(
@@ -244,17 +295,24 @@ function AdminAgenda() {
     return phone.replace(/\D/g, '');
   };
 
+  const formatDateRange = (startDate, endDate) => {
+    if (!startDate) return 'Sin fecha';
+    const start = new Date(`${startDate}T00:00:00`).toLocaleDateString('es-AR');
+    const end = new Date(`${(endDate || startDate)}T00:00:00`).toLocaleDateString('es-AR');
+    return startDate === (endDate || startDate) ? start : `${start} al ${end}`;
+  };
+
   const buildReminderMessage = (item) => {
     const balance = Math.max(
       Number(item.total || 0) - Number(item.paidAmount || 0),
       0
     );
 
-    return `Hola ${item.client}, te recordamos tu reserva en Autoestética Tucumán.
-Fecha: ${new Date(`${item.date}T00:00:00`).toLocaleDateString('es-AR')}
-Turno: ${item.shift}
+    return `Hola ${item.client}, te recordamos tu servicio en Autoestética Tucumán.
+Período: ${formatDateRange(item.startDate, item.endDate)}
 Vehículo: ${item.vehicle}
 Servicios: ${item.services.join(', ')}
+Estado: ${item.status}
 Estado de pago: ${item.paymentStatus}
 Saldo pendiente: $${balance.toLocaleString('es-AR')}
 Cualquier consulta, estamos a disposición.`;
@@ -277,6 +335,20 @@ Cualquier consulta, estamos a disposición.`;
     alert('Recordatorio copiado al portapapeles.');
   };
 
+  const applyClientAutocomplete = (typedName) => {
+    const match = clientSuggestions.find(
+      (item) => item.client.toLowerCase() === typedName.trim().toLowerCase()
+    );
+
+    if (!match) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      client: match.client,
+      phone: prev.phone || match.phone || '',
+    }));
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -293,6 +365,21 @@ Cualquier consulta, estamos a disposición.`;
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleClientBlur = () => {
+    applyClientAutocomplete(formData.client);
+  };
+
+  const handleClientSuggestionChange = (e) => {
+    const value = e.target.value;
+
+    setFormData((prev) => ({
+      ...prev,
+      client: value,
+    }));
+
+    applyClientAutocomplete(value);
   };
 
   const handleServiceToggle = (serviceName) => {
@@ -325,8 +412,8 @@ Cualquier consulta, estamos a disposición.`;
       paymentStatus: '',
       onlyPendingBalance: false,
       onlyToday: false,
-      dateFrom: '',
-      dateTo: '',
+      filterFrom: '',
+      filterTo: '',
     });
 
     setSearchParams({});
@@ -338,8 +425,8 @@ Cualquier consulta, estamos a disposición.`;
       phone: '',
       vehicle: '',
       services: [],
-      date: '',
-      shift: '',
+      startDate: '',
+      endDate: '',
       status: 'Pendiente',
       notes: '',
     });
@@ -349,10 +436,17 @@ Cualquier consulta, estamos a disposición.`;
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const { client, phone, vehicle, services, date, shift, status, notes } = formData;
+    const { client, phone, vehicle, services, startDate, endDate, status, notes } = formData;
 
-    if (!client || !vehicle || services.length === 0 || !date || !shift || !status) {
+    if (!client || !vehicle || services.length === 0 || !startDate || !status) {
       alert('Completá todos los campos obligatorios y seleccioná al menos un servicio.');
+      return;
+    }
+
+    const finalEndDate = endDate || startDate;
+
+    if (finalEndDate < startDate) {
+      alert('La fecha hasta no puede ser anterior a la fecha desde.');
       return;
     }
 
@@ -366,6 +460,7 @@ Cualquier consulta, estamos a disposición.`;
                 ...item,
                 ...formData,
                 phone,
+                endDate: finalEndDate,
                 notes,
                 total,
               }
@@ -377,6 +472,7 @@ Cualquier consulta, estamos a disposición.`;
         id: Date.now(),
         ...formData,
         phone,
+        endDate: finalEndDate,
         total,
         paidAmount: 0,
         notes,
@@ -394,8 +490,8 @@ Cualquier consulta, estamos a disposición.`;
       phone: appointment.phone || '',
       vehicle: appointment.vehicle,
       services: appointment.services,
-      date: appointment.date,
-      shift: appointment.shift,
+      startDate: appointment.startDate || appointment.date || '',
+      endDate: appointment.endDate || appointment.startDate || appointment.date || '',
       status: appointment.status,
       notes: appointment.notes || '',
     });
@@ -427,8 +523,8 @@ Cualquier consulta, estamos a disposición.`;
       Teléfono: item.phone || '',
       Vehículo: item.vehicle,
       Servicios: item.services.join(', '),
-      Fecha: new Date(`${item.date}T00:00:00`).toLocaleDateString('es-AR'),
-      Turno: item.shift,
+      Desde: new Date(`${item.startDate}T00:00:00`).toLocaleDateString('es-AR'),
+      Hasta: new Date(`${(item.endDate || item.startDate)}T00:00:00`).toLocaleDateString('es-AR'),
       Estado: item.status,
       Pago: item.paymentStatus || 'Pendiente',
       Total: item.total,
@@ -451,20 +547,20 @@ Cualquier consulta, estamos a disposición.`;
   return (
     <AdminLayout
       title="Agenda interna"
-      subtitle="Administrá reservas, servicios, estados, pagos y totales desde un solo lugar."
+      subtitle="Administrá reservas por rango de fechas, servicios, estados, pagos y totales."
     >
       <div className="row g-3 mb-4">
         <div className="col-md-4">
           <div className="content-card stats-card admin-kpi-card">
-            <p className="stats-label">Turnos de hoy</p>
+            <p className="stats-label">Servicios activos hoy</p>
             <h3 className="stats-value">{agendaQuickSummary.todayAppointments}</h3>
-            <span className="admin-kpi-helper">Agenda del día</span>
+            <span className="admin-kpi-helper">Dentro del rango actual</span>
           </div>
         </div>
 
         <div className="col-md-4">
           <div className="content-card stats-card admin-kpi-card">
-            <p className="stats-label">Turnos con saldo hoy</p>
+            <p className="stats-label">Con saldo hoy</p>
             <h3 className="stats-value">{agendaQuickSummary.todayPendingAppointments}</h3>
             <span className="admin-kpi-helper">Con deuda pendiente</span>
           </div>
@@ -485,7 +581,7 @@ Cualquier consulta, estamos a disposición.`;
         <div className="col-lg-5">
           <div className="content-card">
             <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="mb-0">{editingId ? 'Editar reserva' : 'Nueva reserva'}</h4>
+              <h4 className="mb-0">{editingId ? 'Editar servicio' : 'Nuevo servicio'}</h4>
               {editingId && (
                 <button
                   type="button"
@@ -503,11 +599,18 @@ Cualquier consulta, estamos a disposición.`;
                 <input
                   type="text"
                   name="client"
+                  list="client-suggestions"
                   className="form-control custom-input"
                   value={formData.client}
-                  onChange={handleChange}
+                  onChange={handleClientSuggestionChange}
+                  onBlur={handleClientBlur}
                   placeholder="Ej: Juan Pérez"
                 />
+                <datalist id="client-suggestions">
+                  {clientSuggestions.map((item) => (
+                    <option key={item.client} value={item.client} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="mb-3">
@@ -562,35 +665,29 @@ Cualquier consulta, estamos a disposición.`;
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Fecha</label>
+                <label className="form-label">Fecha desde</label>
                 <input
                   type="date"
-                  name="date"
+                  name="startDate"
                   className="form-control custom-input"
-                  value={formData.date}
+                  value={formData.startDate}
                   onChange={handleChange}
                 />
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Turno</label>
-                <select
-                  name="shift"
-                  className="form-select custom-input"
-                  value={formData.shift}
+                <label className="form-label">Fecha hasta</label>
+                <input
+                  type="date"
+                  name="endDate"
+                  className="form-control custom-input"
+                  value={formData.endDate}
                   onChange={handleChange}
-                >
-                  <option value="">Seleccioná un turno</option>
-                  {shifts.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Estado de reserva</label>
+                <label className="form-label">Estado del servicio</label>
                 <select
                   name="status"
                   className="form-select custom-input"
@@ -613,7 +710,7 @@ Cualquier consulta, estamos a disposición.`;
                   rows="4"
                   value={formData.notes}
                   onChange={handleChange}
-                  placeholder="Notas internas de la reserva..."
+                  placeholder="Notas internas del servicio..."
                 />
               </div>
 
@@ -625,7 +722,7 @@ Cualquier consulta, estamos a disposición.`;
               </div>
 
               <button type="submit" className="btn btn-brand w-100">
-                {editingId ? 'Guardar cambios' : 'Agregar reserva'}
+                {editingId ? 'Guardar cambios' : 'Agregar servicio'}
               </button>
             </form>
           </div>
@@ -728,7 +825,7 @@ Cualquier consulta, estamos a disposición.`;
                       checked={filters.onlyToday}
                       onChange={handleFilterChange}
                     />
-                    <span>Solo de hoy</span>
+                    <span>Solo activos hoy</span>
                   </label>
                 </div>
               </div>
@@ -737,9 +834,9 @@ Cualquier consulta, estamos a disposición.`;
                 <label className="form-label">Desde</label>
                 <input
                   type="date"
-                  name="dateFrom"
+                  name="filterFrom"
                   className="form-control custom-input"
-                  value={filters.dateFrom}
+                  value={filters.filterFrom}
                   onChange={handleFilterChange}
                 />
               </div>
@@ -748,9 +845,9 @@ Cualquier consulta, estamos a disposición.`;
                 <label className="form-label">Hasta</label>
                 <input
                   type="date"
-                  name="dateTo"
+                  name="filterTo"
                   className="form-control custom-input"
-                  value={filters.dateTo}
+                  value={filters.filterTo}
                   onChange={handleFilterChange}
                 />
               </div>
@@ -760,14 +857,14 @@ Cualquier consulta, estamos a disposición.`;
           <div className="row g-3 mb-4">
             <div className="col-md-4">
               <div className="content-card stats-card">
-                <p className="stats-label">Reservas del período</p>
+                <p className="stats-label">Servicios del período</p>
                 <h3 className="stats-value">{periodSummary.totalReservations}</h3>
               </div>
             </div>
 
             <div className="col-md-4">
               <div className="content-card stats-card">
-                <p className="stats-label">Servicios del período</p>
+                <p className="stats-label">Servicios incluidos</p>
                 <h3 className="stats-value">{periodSummary.totalServices}</h3>
               </div>
             </div>
@@ -808,15 +905,10 @@ Cualquier consulta, estamos a disposición.`;
                   <div key={group.date} className="calendar-day-card">
                     <div className="calendar-day-header">
                       <h5 className="mb-0">
-                        {new Date(`${group.date}T00:00:00`).toLocaleDateString('es-AR', {
-                          weekday: 'long',
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })}
+                        Inicio: {new Date(`${group.date}T00:00:00`).toLocaleDateString('es-AR')}
                       </h5>
                       <span className="results-counter">
-                        {group.items.length} turno(s)
+                        {group.items.length} servicio(s)
                       </span>
                     </div>
 
@@ -825,7 +917,7 @@ Cualquier consulta, estamos a disposición.`;
                         <div
                           key={item.id}
                           className={`calendar-appointment-card
-                            ${item.date === todayDate ? 'appointment-today' : ''}
+                            ${isDateInRange(todayDate, item.startDate, item.endDate) ? 'appointment-today' : ''}
                             ${Number(item.balance || 0) > 0 ? 'appointment-pending-balance' : ''}
                             ${item.status === 'Confirmado' ? 'appointment-confirmed' : ''}
                             ${item.status === 'Finalizado' ? 'appointment-finished' : ''}
@@ -835,7 +927,10 @@ Cualquier consulta, estamos a disposición.`;
                             <div>
                               <h6 className="mb-1">{item.client}</h6>
                               <p className="mb-0 text-muted-custom">
-                                {item.vehicle} · {item.shift}
+                                {item.vehicle}
+                              </p>
+                              <p className="mb-0 text-muted-custom">
+                                {formatDateRange(item.startDate, item.endDate)}
                               </p>
                               {item.phone && (
                                 <p className="mb-0 text-muted-custom">
@@ -867,8 +962,8 @@ Cualquier consulta, estamos a disposición.`;
                           </div>
 
                           <div className="appointment-priority-tags mb-2">
-                            {item.date === todayDate && (
-                              <span className="priority-tag today-tag">Hoy</span>
+                            {isDateInRange(todayDate, item.startDate, item.endDate) && (
+                              <span className="priority-tag today-tag">Activo hoy</span>
                             )}
 
                             {Number(item.balance || 0) > 0 && (
@@ -876,11 +971,11 @@ Cualquier consulta, estamos a disposición.`;
                             )}
 
                             {item.status === 'Confirmado' && (
-                              <span className="priority-tag confirmed-tag">Confirmada</span>
+                              <span className="priority-tag confirmed-tag">Confirmado</span>
                             )}
 
                             {item.status === 'Finalizado' && (
-                              <span className="priority-tag finished-tag">Finalizada</span>
+                              <span className="priority-tag finished-tag">Finalizado</span>
                             )}
                           </div>
 
@@ -972,7 +1067,7 @@ Cualquier consulta, estamos a disposición.`;
               </div>
             ) : (
               <p className="mb-0 text-muted-custom">
-                No hay reservas que coincidan con los filtros.
+                No hay servicios que coincidan con los filtros.
               </p>
             )}
           </div>
@@ -988,8 +1083,8 @@ Cualquier consulta, estamos a disposición.`;
                     <th>Teléfono</th>
                     <th>Vehículo</th>
                     <th>Servicios</th>
-                    <th>Fecha</th>
-                    <th>Turno</th>
+                    <th>Desde</th>
+                    <th>Hasta</th>
                     <th>Estado</th>
                     <th>Pago</th>
                     <th>Total</th>
@@ -1003,7 +1098,7 @@ Cualquier consulta, estamos a disposición.`;
                     <tr
                       key={item.id}
                       className={`
-                        ${item.date === todayDate ? 'row-today' : ''}
+                        ${isDateInRange(todayDate, item.startDate, item.endDate) ? 'row-today' : ''}
                         ${Number(item.balance || 0) > 0 ? 'row-pending-balance' : ''}
                       `}
                     >
@@ -1019,8 +1114,8 @@ Cualquier consulta, estamos a disposición.`;
                           ))}
                         </div>
                       </td>
-                      <td>{new Date(`${item.date}T00:00:00`).toLocaleDateString('es-AR')}</td>
-                      <td>{item.shift}</td>
+                      <td>{new Date(`${item.startDate}T00:00:00`).toLocaleDateString('es-AR')}</td>
+                      <td>{new Date(`${(item.endDate || item.startDate)}T00:00:00`).toLocaleDateString('es-AR')}</td>
                       <td>
                         <span className={`status-badge status-${item.status.toLowerCase()}`}>
                           {item.status}
@@ -1092,7 +1187,7 @@ Cualquier consulta, estamos a disposición.`;
 
             {filteredAppointments.length === 0 && (
               <p className="mb-0 text-muted-custom">
-                No hay reservas que coincidan con los filtros.
+                No hay servicios que coincidan con los filtros.
               </p>
             )}
           </div>
@@ -1100,7 +1195,7 @@ Cualquier consulta, estamos a disposición.`;
           {selectedAppointment && (
             <div className="content-card mt-4">
               <div className="d-flex justify-content-between align-items-center mb-4">
-                <h4 className="mb-0">Detalle de reserva</h4>
+                <h4 className="mb-0">Detalle del servicio</h4>
                 <button
                   type="button"
                   className="btn btn-outline-light btn-sm"
@@ -1114,11 +1209,8 @@ Cualquier consulta, estamos a disposición.`;
                 <div><strong>Cliente:</strong> {selectedAppointment.client}</div>
                 <div><strong>Teléfono:</strong> {selectedAppointment.phone || '-'}</div>
                 <div><strong>Vehículo:</strong> {selectedAppointment.vehicle}</div>
-                <div>
-                  <strong>Fecha:</strong>{' '}
-                  {new Date(`${selectedAppointment.date}T00:00:00`).toLocaleDateString('es-AR')}
-                </div>
-                <div><strong>Turno:</strong> {selectedAppointment.shift}</div>
+                <div><strong>Desde:</strong> {new Date(`${selectedAppointment.startDate}T00:00:00`).toLocaleDateString('es-AR')}</div>
+                <div><strong>Hasta:</strong> {new Date(`${(selectedAppointment.endDate || selectedAppointment.startDate)}T00:00:00`).toLocaleDateString('es-AR')}</div>
                 <div><strong>Estado:</strong> {selectedAppointment.status}</div>
                 <div><strong>Pago:</strong> {selectedAppointment.paymentStatus}</div>
                 <div>

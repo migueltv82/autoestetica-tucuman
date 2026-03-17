@@ -7,6 +7,15 @@ function AdminClients() {
 
   const [search, setSearch] = useState('');
 
+  const formatDateRange = (startDate, endDate) => {
+    if (!startDate) return 'Sin fecha';
+
+    const start = new Date(`${startDate}T00:00:00`).toLocaleDateString('es-AR');
+    const end = new Date(`${(endDate || startDate)}T00:00:00`).toLocaleDateString('es-AR');
+
+    return startDate === (endDate || startDate) ? start : `${start} al ${end}`;
+  };
+
   const clients = useMemo(() => {
     const map = new Map();
 
@@ -38,7 +47,11 @@ function AdminClients() {
           totalBalance: 0,
           vehicles: new Set(),
           services: new Set(),
-          lastReservationDate: appointment.date || '',
+          lastReservationDate: appointment.startDate || appointment.date || '',
+          lastReservationRange: formatDateRange(
+            appointment.startDate || appointment.date || '',
+            appointment.endDate || appointment.startDate || appointment.date || ''
+          ),
         });
       }
 
@@ -59,8 +72,13 @@ function AdminClients() {
 
       (appointment.services || []).forEach((service) => current.services.add(service));
 
-      if (appointment.date && appointment.date > current.lastReservationDate) {
-        current.lastReservationDate = appointment.date;
+      const appointmentStart = appointment.startDate || appointment.date || '';
+      if (appointmentStart && appointmentStart > current.lastReservationDate) {
+        current.lastReservationDate = appointmentStart;
+        current.lastReservationRange = formatDateRange(
+          appointment.startDate || appointment.date || '',
+          appointment.endDate || appointment.startDate || appointment.date || ''
+        );
       }
     });
 
@@ -70,10 +88,13 @@ function AdminClients() {
         vehicles: Array.from(item.vehicles),
         services: Array.from(item.services),
       }))
-      .filter((item) =>
-        item.client.toLowerCase().includes(search.toLowerCase()) ||
-        (item.phone || '').toLowerCase().includes(search.toLowerCase())
-      )
+      .filter((item) => {
+        const term = search.toLowerCase();
+        return (
+          item.client.toLowerCase().includes(term) ||
+          (item.phone || '').toLowerCase().includes(term)
+        );
+      })
       .sort((a, b) => a.client.localeCompare(b.client));
   }, [appointments, cashEntries, search]);
 
@@ -88,14 +109,14 @@ function AdminClients() {
   return (
     <AdminLayout
       title="Clientes"
-      subtitle="Consultá rápidamente clientes, teléfonos, reservas acumuladas y saldo pendiente."
+      subtitle="Consultá rápidamente clientes, teléfonos, servicios acumulados y saldo pendiente."
     >
       <div className="row g-3 mb-4">
         <div className="col-md-4">
           <div className="content-card stats-card admin-kpi-card">
             <p className="stats-label">Clientes</p>
             <h3 className="stats-value">{summary.totalClients}</h3>
-            <span className="admin-kpi-helper">Registrados en reservas</span>
+            <span className="admin-kpi-helper">Registrados en servicios</span>
           </div>
         </div>
 
@@ -165,7 +186,7 @@ function AdminClients() {
 
                 <div className="client-card-stats">
                   <div className="client-stat-box">
-                    <span>Reservas</span>
+                    <span>Servicios</span>
                     <strong>{client.reservations}</strong>
                   </div>
                   <div className="client-stat-box">
@@ -210,10 +231,7 @@ function AdminClients() {
 
                 <div className="client-card-footer">
                   <span className="text-muted-custom">
-                    Última reserva:{' '}
-                    {client.lastReservationDate
-                      ? new Date(`${client.lastReservationDate}T00:00:00`).toLocaleDateString('es-AR')
-                      : '-'}
+                    Último período: {client.lastReservationRange || '-'}
                   </span>
                 </div>
               </div>
