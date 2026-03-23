@@ -16,7 +16,7 @@ function Login() {
 
     if (username === adminUser && password === adminPass) {
       localStorage.setItem('isAdminAuth', 'true');
-      navigate('/agenda');
+      navigate('/dashboard');
       return;
     }
 

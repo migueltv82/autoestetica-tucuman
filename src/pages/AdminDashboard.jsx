@@ -1,1509 +1,234 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import * as XLSX from "xlsx";
 import AdminLayout from "../Components/admin/AdminLayout.jsx";
+import {
+  getBookings,
+  updateBookingStatus,
+  updatePaymentStatus,
+  deleteBooking,
+} from "../lib/bookings";
 import "../styles/AdminDashboard.css";
 
 function AdminDashboard() {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
 
-  const serviceOptions = {
-    Auto: [
-      { name: "Limpieza de interior", price: 18000 },
-      { name: "Pulido y abrillantado", price: 45000 },
-      { name: "Lavado de motor", price: 12000 },
-    ],
-    Camioneta: [
-      { name: "Limpieza de interior", price: 22000 },
-      { name: "Pulido y abrillantado", price: 52000 },
-      { name: "Lavado de motor", price: 15000 },
-    ],
-    Moto: [{ name: "Lavado y detallado de motos", price: 10000 }],
-    Bicicleta: [{ name: "Lavado y detallado de bicicletas", price: 8000 }],
-  };
-
-  const vehicles = ["Auto", "Camioneta", "Moto", "Bicicleta"];
-  const statuses = [
-    "Pendiente",
-    "Confirmado",
-    "En proceso",
-    "Finalizado",
-    "Cancelado",
-  ];
-  const paymentStatuses = ["Pendiente", "Señado", "Pagado"];
-
-  const toCssSlug = (value = "") =>
-    value
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/\s+/g, "-");
-
-  const [appointments, setAppointments] = useState(() => {
-    const saved = localStorage.getItem("adminAppointments");
-    return saved
-      ? JSON.parse(saved)
-      : [
-          {
-            id: 1,
-            client: "Juan Pérez",
-            phone: "",
-            vehicle: "Auto",
-            services: ["Limpieza de interior", "Lavado de motor"],
-            startDate: "2026-03-10",
-            endDate: "2026-03-11",
-            status: "Pendiente",
-            paymentStatus: "Pendiente",
-            paidAmount: 0,
-            total: 30000,
-            notes: "",
-          },
-        ];
-  });
-
-  const [cashEntries, setCashEntries] = useState(() => {
-    const saved = localStorage.getItem("adminCashEntries");
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [formData, setFormData] = useState({
-    client: "",
-    phone: "",
-    vehicle: "",
-    services: [],
-    startDate: "",
-    endDate: "",
-    status: "Pendiente",
-    notes: "",
-  });
-
-  const [editingId, setEditingId] = useState(null);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
-
-  const [filters, setFilters] = useState({
-    client: searchParams.get("client") || "",
-    vehicle: "",
-    status: "",
-    paymentStatus: "",
-    onlyPendingBalance: false,
-    onlyToday: false,
-    filterFrom: "",
-    filterTo: "",
-  });
+  async function loadBookings() {
+    try {
+      setLoading(true);
+      const data = await getBookings();
+      setBookings(data);
+    } catch (error) {
+      console.error(error);
+      setMessage("Error al cargar las reservas.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    localStorage.setItem("adminAppointments", JSON.stringify(appointments));
-  }, [appointments]);
-
-  useEffect(() => {
-    const syncCash = () => {
-      const updatedCashEntries = JSON.parse(
-        localStorage.getItem("adminCashEntries") || "[]"
-      );
-      setCashEntries(updatedCashEntries);
-    };
-
-    window.addEventListener("storage", syncCash);
-    syncCash();
-
-    return () => window.removeEventListener("storage", syncCash);
+    loadBookings();
   }, []);
 
-  useEffect(() => {
-    const clientFromUrl = searchParams.get("client") || "";
-
-    setFilters((prev) => ({
-      ...prev,
-      client: clientFromUrl,
-    }));
-  }, [searchParams]);
-
-  const clientSuggestions = useMemo(() => {
-    const map = new Map();
-
-    appointments.forEach((item) => {
-      const name = (item.client || "").trim();
-      const phone = (item.phone || "").trim();
-
-      if (!name) return;
-
-      if (!map.has(name.toLowerCase())) {
-        map.set(name.toLowerCase(), {
-          client: name,
-          phone,
-        });
-      } else {
-        const existing = map.get(name.toLowerCase());
-        if (!existing.phone && phone) {
-          map.set(name.toLowerCase(), {
-            client: name,
-            phone,
-          });
-        }
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) =>
-      a.client.localeCompare(b.client)
-    );
-  }, [appointments]);
-
-  const todayDate = new Date().toISOString().split("T")[0];
-
-  const isDateInRange = (date, startDate, endDate) => {
-    if (!startDate) return false;
-    const end = endDate || startDate;
-    return date >= startDate && date <= end;
-  };
-
-  const rangesOverlap = (startA, endA, startB, endB) => {
-    const aEnd = endA || startA;
-    const bEnd = endB || startB;
-    return startA <= bEnd && aEnd >= startB;
-  };
-
-  const doesRangeOverlap = (itemStart, itemEnd, filterFrom, filterTo) => {
-    const start = itemStart;
-    const end = itemEnd || itemStart;
-
-    if (filterFrom && end < filterFrom) return false;
-    if (filterTo && start > filterTo) return false;
-    return true;
-  };
-
-  const appointmentsWithPayments = useMemo(() => {
-    return appointments.map((appointment) => {
-      const linkedPayments = cashEntries.filter(
-        (entry) => String(entry.linkedAppointmentId) === String(appointment.id)
-      );
-
-      const paidAmount = linkedPayments.reduce(
-        (acc, entry) => acc + Number(entry.amount || 0),
-        0
-      );
-
-      const balance = Math.max(Number(appointment.total || 0) - paidAmount, 0);
-
-      let paymentStatus = "Pendiente";
-      if (paidAmount > 0 && paidAmount < Number(appointment.total || 0)) {
-        paymentStatus = "Señado";
-      }
-      if (
-        paidAmount >= Number(appointment.total || 0) &&
-        Number(appointment.total || 0) > 0
-      ) {
-        paymentStatus = "Pagado";
-      }
-
-      return {
-        ...appointment,
-        linkedPayments,
-        paidAmount,
-        balance,
-        paymentStatus,
-      };
-    });
-  }, [appointments, cashEntries]);
-
-  const availableServices = useMemo(() => {
-    return formData.vehicle ? serviceOptions[formData.vehicle] || [] : [];
-  }, [formData.vehicle]);
-
-  const filteredAppointments = useMemo(() => {
-    return appointmentsWithPayments.filter((item) => {
-      const matchesClient = (item.client || "")
-        .toLowerCase()
-        .includes(filters.client.toLowerCase());
-
-      const matchesVehicle = filters.vehicle
-        ? item.vehicle === filters.vehicle
-        : true;
-      const matchesStatus = filters.status ? item.status === filters.status : true;
-      const matchesPaymentStatus = filters.paymentStatus
-        ? item.paymentStatus === filters.paymentStatus
-        : true;
-      const matchesOnlyPendingBalance = filters.onlyPendingBalance
-        ? Number(item.balance || 0) > 0
-        : true;
-      const matchesOnlyToday = filters.onlyToday
-        ? isDateInRange(todayDate, item.startDate, item.endDate)
-        : true;
-
-      const matchesDateRange = doesRangeOverlap(
-        item.startDate,
-        item.endDate,
-        filters.filterFrom,
-        filters.filterTo
-      );
-
-      return (
-        matchesClient &&
-        matchesVehicle &&
-        matchesStatus &&
-        matchesPaymentStatus &&
-        matchesOnlyPendingBalance &&
-        matchesOnlyToday &&
-        matchesDateRange
-      );
-    });
-  }, [appointmentsWithPayments, filters, todayDate]);
-
-  const groupedAppointments = useMemo(() => {
-    const grouped = filteredAppointments.reduce((acc, item) => {
-      const key = item.startDate || "Sin fecha";
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(item);
-      return acc;
-    }, {});
-
-    return Object.entries(grouped)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, items]) => ({
-        date,
-        items: items.sort((a, b) =>
-          (a.endDate || a.startDate).localeCompare(b.endDate || b.startDate)
-        ),
-      }));
-  }, [filteredAppointments]);
-
-  const periodSummary = useMemo(() => {
-    const totalReservations = filteredAppointments.length;
-    const totalRevenue = filteredAppointments.reduce(
-      (acc, item) => acc + (item.total || 0),
-      0
-    );
-    const totalServices = filteredAppointments.reduce(
-      (acc, item) => acc + (item.services?.length || 0),
-      0
-    );
-
-    return {
-      totalReservations,
-      totalRevenue,
-      totalServices,
-    };
-  }, [filteredAppointments]);
-
-  const agendaQuickSummary = useMemo(() => {
-    const todayAppointments = appointmentsWithPayments.filter((item) =>
-      isDateInRange(todayDate, item.startDate, item.endDate)
-    );
-
-    const todayPendingAppointments = todayAppointments.filter(
-      (item) => Number(item.balance || 0) > 0
-    );
-
-    const totalPendingToday = todayAppointments.reduce(
-      (acc, item) => acc + Number(item.balance || 0),
-      0
-    );
-
-    return {
-      todayAppointments: todayAppointments.length,
-      todayPendingAppointments: todayPendingAppointments.length,
-      totalPendingToday,
-    };
-  }, [appointmentsWithPayments, todayDate]);
-
-  const calculateTotal = (vehicle, selectedServices) => {
-    const vehicleServices = serviceOptions[vehicle] || [];
-    return selectedServices.reduce((acc, serviceName) => {
-      const found = vehicleServices.find((item) => item.name === serviceName);
-      return acc + (found ? found.price : 0);
-    }, 0);
-  };
-
-  const normalizePhoneForWa = (phone) => {
-    if (!phone) return "";
-    return phone.replace(/\D/g, "");
-  };
-
-  const formatDateRange = (startDate, endDate) => {
-    if (!startDate) return "Sin fecha";
-    const start = new Date(`${startDate}T00:00:00`).toLocaleDateString("es-AR");
-    const end = new Date(
-      `${endDate || startDate}T00:00:00`
-    ).toLocaleDateString("es-AR");
-    return startDate === (endDate || startDate) ? start : `${start} al ${end}`;
-  };
-
-  const buildReminderMessage = (item) => {
-    const balance = Math.max(
-      Number(item.total || 0) - Number(item.paidAmount || 0),
-      0
-    );
-
-    return `Hola ${item.client}, te recordamos tu servicio en Autoestética Tucumán.
-Período: ${formatDateRange(item.startDate, item.endDate)}
-Vehículo: ${item.vehicle}
-Servicios: ${item.services.join(", ")}
-Estado: ${item.status}
-Estado de pago: ${item.paymentStatus}
-Saldo pendiente: $${balance.toLocaleString("es-AR")}
-Cualquier consulta, estamos a disposición.`;
-  };
-
-  const openWhatsAppReminder = (item) => {
-    const message = buildReminderMessage(item);
-    const cleanPhone = normalizePhoneForWa(item.phone);
-
-    const url = cleanPhone
-      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
-
-    window.open(url, "_blank");
-  };
-
-  const copyReminderMessage = async (item) => {
+  async function handleStatusChange(id, newStatus) {
     try {
-      const message = buildReminderMessage(item);
-      await navigator.clipboard.writeText(message);
-      alert("Recordatorio copiado al portapapeles.");
-    } catch (error) {
-      console.error("No se pudo copiar el recordatorio:", error);
-      alert("No se pudo copiar el recordatorio.");
-    }
-  };
-
-  const applyClientAutocomplete = (typedName) => {
-    const match = clientSuggestions.find(
-      (item) => item.client.toLowerCase() === typedName.trim().toLowerCase()
-    );
-
-    if (!match) return;
-
-    setFormData((prev) => ({
-      ...prev,
-      client: match.client,
-      phone: prev.phone || match.phone || "",
-    }));
-  };
-
-  const findOverlappingAppointments = (
-    vehicle,
-    startDate,
-    endDate,
-    currentId = null
-  ) => {
-    if (!vehicle || !startDate) return [];
-
-    const finalEndDate = endDate || startDate;
-
-    return appointments.filter((item) => {
-      if (currentId && String(item.id) === String(currentId)) return false;
-      if (item.vehicle !== vehicle) return false;
-
-      const itemStart = item.startDate || item.date;
-      const itemEnd = item.endDate || item.startDate || item.date;
-
-      if (!itemStart) return false;
-
-      return rangesOverlap(startDate, finalEndDate, itemStart, itemEnd);
-    });
-  };
-
-  const buildOverlapMessage = (overlaps) => {
-    if (overlaps.length === 0) return "";
-
-    const lines = overlaps.map(
-      (item) =>
-        `- ${item.client} | ${item.vehicle} | ${formatDateRange(
-          item.startDate || item.date,
-          item.endDate || item.startDate || item.date
-        )}`
-    );
-
-    return `Hay ${overlaps.length} servicio(s) que se superponen en esas fechas para ese vehículo:\n\n${lines.join(
-      "\n"
-    )}\n\n¿Querés guardar igual?`;
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    if (name === "vehicle") {
-      setFormData((prev) => ({
-        ...prev,
-        vehicle: value,
-        services: [],
-      }));
-      return;
-    }
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleClientBlur = () => {
-    applyClientAutocomplete(formData.client);
-  };
-
-  const handleClientSuggestionChange = (e) => {
-    const value = e.target.value;
-
-    setFormData((prev) => ({
-      ...prev,
-      client: value,
-    }));
-
-    applyClientAutocomplete(value);
-  };
-
-  const handleServiceToggle = (serviceName) => {
-    setFormData((prev) => {
-      const exists = prev.services.includes(serviceName);
-
-      return {
-        ...prev,
-        services: exists
-          ? prev.services.filter((item) => item !== serviceName)
-          : [...prev.services, serviceName],
-      };
-    });
-  };
-
-  const handleFilterChange = (e) => {
-    const { name, value, type, checked } = e.target;
-
-    setFilters((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      client: "",
-      vehicle: "",
-      status: "",
-      paymentStatus: "",
-      onlyPendingBalance: false,
-      onlyToday: false,
-      filterFrom: "",
-      filterTo: "",
-    });
-
-    setSearchParams({});
-  };
-
-  const resetForm = () => {
-    setFormData({
-      client: "",
-      phone: "",
-      vehicle: "",
-      services: [],
-      startDate: "",
-      endDate: "",
-      status: "Pendiente",
-      notes: "",
-    });
-    setEditingId(null);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    const {
-      client,
-      phone,
-      vehicle,
-      services,
-      startDate,
-      endDate,
-      status,
-      notes,
-    } = formData;
-
-    if (!client || !vehicle || services.length === 0 || !startDate || !status) {
-      alert(
-        "Completá todos los campos obligatorios y seleccioná al menos un servicio."
-      );
-      return;
-    }
-
-    const finalEndDate = endDate || startDate;
-
-    if (finalEndDate < startDate) {
-      alert("La fecha hasta no puede ser anterior a la fecha desde.");
-      return;
-    }
-
-    const overlaps = findOverlappingAppointments(
-      vehicle,
-      startDate,
-      finalEndDate,
-      editingId
-    );
-
-    if (overlaps.length > 0) {
-      const confirmed = window.confirm(buildOverlapMessage(overlaps));
-      if (!confirmed) return;
-    }
-
-    const total = calculateTotal(vehicle, services);
-
-    if (editingId) {
-      setAppointments((prev) =>
-        prev.map((item) =>
-          item.id === editingId
-            ? {
-                ...item,
-                ...formData,
-                phone,
-                endDate: finalEndDate,
-                notes,
-                total,
-              }
-            : item
+      await updateBookingStatus(id, newStatus);
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === id ? { ...booking, status: newStatus } : booking
         )
       );
-    } else {
-      const newAppointment = {
-        id: Date.now(),
-        ...formData,
-        phone,
-        endDate: finalEndDate,
-        total,
-        paidAmount: 0,
-        notes,
-      };
-
-      setAppointments((prev) => [...prev, newAppointment]);
+    } catch (error) {
+      console.error(error);
+      setMessage("No se pudo actualizar el estado de la reserva.");
     }
+  }
 
-    resetForm();
-  };
+  async function handlePaymentChange(id, newPaymentStatus) {
+    try {
+      await updatePaymentStatus(id, newPaymentStatus);
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === id
+            ? { ...booking, payment_status: newPaymentStatus }
+            : booking
+        )
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage("No se pudo actualizar el estado de pago.");
+    }
+  }
 
-  const handleEdit = (appointment) => {
-    setFormData({
-      client: appointment.client,
-      phone: appointment.phone || "",
-      vehicle: appointment.vehicle,
-      services: appointment.services,
-      startDate: appointment.startDate || appointment.date || "",
-      endDate:
-        appointment.endDate ||
-        appointment.startDate ||
-        appointment.date ||
-        "",
-      status: appointment.status,
-      notes: appointment.notes || "",
-    });
-    setEditingId(appointment.id);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  async function handleDelete(id) {
+  const confirmDelete = window.confirm(
+    "¿Seguro que querés eliminar esta reserva?"
+  );
 
-  const handleDelete = (id) => {
-    const confirmed = window.confirm("¿Querés eliminar esta reserva?");
-    if (!confirmed) return;
+  if (!confirmDelete) return;
 
-    setAppointments((prev) => prev.filter((item) => item.id !== id));
+  try {
+    await deleteBooking(id);
+    await loadBookings();
+    setMessage("Reserva eliminada correctamente.");
+  } catch (error) {
+    console.error("Error al eliminar:", error);
+    setMessage(error.message || "No se pudo eliminar la reserva.");
+  }
+}
 
-    if (editingId === id) resetForm();
-    if (selectedAppointment?.id === id) setSelectedAppointment(null);
-  };
+  const stats = useMemo(() => {
+    const total = bookings.length;
+    const pendientes = bookings.filter((b) => b.status === "pendiente").length;
+    const confirmadas = bookings.filter((b) => b.status === "confirmada").length;
+    const finalizadas = bookings.filter((b) => b.status === "finalizada").length;
 
-  const handleGoToCash = (item) => {
-    navigate(`/caja?appointmentId=${item.id}`);
-  };
-
-  const exportToExcel = () => {
-    const dataToExport = filteredAppointments.map((item) => ({
-      Cliente: item.client,
-      Teléfono: item.phone || "",
-      Vehículo: item.vehicle,
-      Servicios: item.services.join(", "),
-      Desde: new Date(`${item.startDate}T00:00:00`).toLocaleDateString("es-AR"),
-      Hasta: new Date(
-        `${item.endDate || item.startDate}T00:00:00`
-      ).toLocaleDateString("es-AR"),
-      Estado: item.status,
-      Pago: item.paymentStatus || "Pendiente",
-      Total: item.total,
-      Pagado: item.paidAmount || 0,
-      Saldo: item.balance || 0,
-      Observaciones: item.notes || "",
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Agenda");
-
-    const fileName = `agenda_autoestetica_${new Date()
-      .toISOString()
-      .slice(0, 10)}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
-  };
-
-  const currentTotal = calculateTotal(formData.vehicle, formData.services);
-
-  const currentOverlaps = useMemo(() => {
-    if (!formData.vehicle || !formData.startDate) return [];
-    return findOverlappingAppointments(
-      formData.vehicle,
-      formData.startDate,
-      formData.endDate || formData.startDate,
-      editingId
-    );
-  }, [
-    formData.vehicle,
-    formData.startDate,
-    formData.endDate,
-    editingId,
-    appointments,
-  ]);
+    return { total, pendientes, confirmadas, finalizadas };
+  }, [bookings]);
 
   return (
-    <AdminLayout
-      title="Panel de administración"
-      subtitle="Resumen general, agenda y control operativo."
-    >
-      <div className="row g-3 mb-4">
-        <div className="col-md-4">
-          <div className="content-card stats-card admin-kpi-card">
-            <p className="stats-label">Servicios activos hoy</p>
-            <h3 className="stats-value">{agendaQuickSummary.todayAppointments}</h3>
-            <span className="admin-kpi-helper">Dentro del rango actual</span>
+    <AdminLayout>
+      <div className="admin-dashboard container py-4">
+        <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+          <div>
+            <h2 className="mb-1">Panel de reservas</h2>
+            <p className="text-muted mb-0">
+              Gestión real de turnos guardados en Supabase
+            </p>
+          </div>
+
+          <button className="btn btn-dark" onClick={loadBookings}>
+            Recargar
+          </button>
+        </div>
+
+        {message && <div className="alert alert-warning">{message}</div>}
+
+        <div className="row g-3 mb-4">
+          <div className="col-md-3">
+            <div className="card shadow-sm border-0">
+              <div className="card-body">
+                <h6 className="text-muted">Total reservas</h6>
+                <h3>{stats.total}</h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-md-3">
+            <div className="card shadow-sm border-0">
+              <div className="card-body">
+                <h6 className="text-muted">Pendientes</h6>
+                <h3>{stats.pendientes}</h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-md-3">
+            <div className="card shadow-sm border-0">
+              <div className="card-body">
+                <h6 className="text-muted">Confirmadas</h6>
+                <h3>{stats.confirmadas}</h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-md-3">
+            <div className="card shadow-sm border-0">
+              <div className="card-body">
+                <h6 className="text-muted">Finalizadas</h6>
+                <h3>{stats.finalizadas}</h3>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="col-md-4">
-          <div className="content-card stats-card admin-kpi-card">
-            <p className="stats-label">Con saldo hoy</p>
-            <h3 className="stats-value">
-              {agendaQuickSummary.todayPendingAppointments}
-            </h3>
-            <span className="admin-kpi-helper">Con deuda pendiente</span>
-          </div>
-        </div>
+        <div className="card shadow-sm border-0">
+          <div className="card-body">
+            <h5 className="mb-3">Listado de reservas</h5>
 
-        <div className="col-md-4">
-          <div className="content-card stats-card admin-kpi-card">
-            <p className="stats-label">Pendiente de hoy</p>
-            <h3 className="stats-value">
-              ${agendaQuickSummary.totalPendingToday.toLocaleString("es-AR")}
-            </h3>
-            <span className="admin-kpi-helper">Saldo acumulado</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="row g-4">
-        <div className="col-lg-5">
-          <div className="content-card">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="mb-0">
-                {editingId ? "Editar servicio" : "Nuevo servicio"}
-              </h4>
-              {editingId && (
-                <button
-                  type="button"
-                  className="btn btn-outline-light btn-sm"
-                  onClick={resetForm}
-                >
-                  Cancelar edición
-                </button>
-              )}
-            </div>
-
-            <form onSubmit={handleSubmit}>
-              <div className="mb-3">
-                <label className="form-label">Cliente</label>
-                <input
-                  type="text"
-                  name="client"
-                  list="client-suggestions"
-                  className="form-control custom-input"
-                  value={formData.client}
-                  onChange={handleClientSuggestionChange}
-                  onBlur={handleClientBlur}
-                  placeholder="Ej: Juan Pérez"
-                />
-                <datalist id="client-suggestions">
-                  {clientSuggestions.map((item) => (
-                    <option key={item.client} value={item.client} />
-                  ))}
-                </datalist>
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label">Teléfono</label>
-                <input
-                  type="text"
-                  name="phone"
-                  className="form-control custom-input"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="Ej: 5493811234567"
-                />
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label">Vehículo</label>
-                <select
-                  name="vehicle"
-                  className="form-select custom-input"
-                  value={formData.vehicle}
-                  onChange={handleChange}
-                >
-                  <option value="">Seleccioná un vehículo</option>
-                  {vehicles.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label">Servicios</label>
-                <div className="services-checklist">
-                  {!formData.vehicle && (
-                    <p className="mb-0 text-muted-custom">
-                      Primero elegí un vehículo.
-                    </p>
-                  )}
-
-                  {availableServices.map((item) => (
-                    <label key={item.name} className="service-check-item">
-                      <input
-                        type="checkbox"
-                        checked={formData.services.includes(item.name)}
-                        onChange={() => handleServiceToggle(item.name)}
-                      />
-                      <span>
-                        {item.name} — ${item.price.toLocaleString("es-AR")}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label">Fecha desde</label>
-                <input
-                  type="date"
-                  name="startDate"
-                  className="form-control custom-input"
-                  value={formData.startDate}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label">Fecha hasta</label>
-                <input
-                  type="date"
-                  name="endDate"
-                  className="form-control custom-input"
-                  value={formData.endDate}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {currentOverlaps.length > 0 && (
-                <div className="overlap-warning-box mb-3">
-                  <strong>Atención:</strong> hay {currentOverlaps.length} servicio(s)
-                  que se superponen para ese vehículo.
-                  <div className="overlap-warning-list">
-                    {currentOverlaps.map((item) => (
-                      <div key={item.id} className="overlap-warning-item">
-                        <span>{item.client}</span>
-                        <span>
-                          {formatDateRange(
-                            item.startDate || item.date,
-                            item.endDate || item.startDate || item.date
-                          )}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="mb-3">
-                <label className="form-label">Estado del servicio</label>
-                <select
-                  name="status"
-                  className="form-select custom-input"
-                  value={formData.status}
-                  onChange={handleChange}
-                >
-                  {statuses.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mb-4">
-                <label className="form-label">Observaciones internas</label>
-                <textarea
-                  name="notes"
-                  className="form-control custom-input custom-textarea"
-                  rows="4"
-                  value={formData.notes}
-                  onChange={handleChange}
-                  placeholder="Notas internas del servicio..."
-                />
-              </div>
-
-              <div className="admin-total-box mb-4">
-                <span className="admin-total-label">Total:</span>
-                <span className="admin-total-value">
-                  ${currentTotal.toLocaleString("es-AR")}
-                </span>
-              </div>
-
-              <button type="submit" className="btn btn-brand w-100">
-                {editingId ? "Guardar cambios" : "Agregar servicio"}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <div className="col-lg-7">
-          <div className="content-card mb-4">
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
-              <h4 className="mb-0">Filtros</h4>
-              <button
-                type="button"
-                className="btn btn-outline-light btn-sm"
-                onClick={clearFilters}
-              >
-                Limpiar filtros
-              </button>
-            </div>
-
-            <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label">Cliente</label>
-                <input
-                  type="text"
-                  name="client"
-                  className="form-control custom-input"
-                  value={filters.client}
-                  onChange={handleFilterChange}
-                  placeholder="Buscar por nombre"
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label">Vehículo</label>
-                <select
-                  name="vehicle"
-                  className="form-select custom-input"
-                  value={filters.vehicle}
-                  onChange={handleFilterChange}
-                >
-                  <option value="">Todos</option>
-                  {vehicles.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="col-md-4">
-                <label className="form-label">Estado</label>
-                <select
-                  name="status"
-                  className="form-select custom-input"
-                  value={filters.status}
-                  onChange={handleFilterChange}
-                >
-                  <option value="">Todos</option>
-                  {statuses.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="col-md-4">
-                <label className="form-label">Pago</label>
-                <select
-                  name="paymentStatus"
-                  className="form-select custom-input"
-                  value={filters.paymentStatus}
-                  onChange={handleFilterChange}
-                >
-                  <option value="">Todos</option>
-                  {paymentStatuses.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="col-md-4">
-                <label className="form-label">Prioridad</label>
-                <div className="quick-filter-check quick-filter-stack">
-                  <label className="service-check-item quick-check-item">
-                    <input
-                      type="checkbox"
-                      name="onlyPendingBalance"
-                      checked={filters.onlyPendingBalance}
-                      onChange={handleFilterChange}
-                    />
-                    <span>Solo con saldo pendiente</span>
-                  </label>
-
-                  <label className="service-check-item quick-check-item">
-                    <input
-                      type="checkbox"
-                      name="onlyToday"
-                      checked={filters.onlyToday}
-                      onChange={handleFilterChange}
-                    />
-                    <span>Solo activos hoy</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label">Desde</label>
-                <input
-                  type="date"
-                  name="filterFrom"
-                  className="form-control custom-input"
-                  value={filters.filterFrom}
-                  onChange={handleFilterChange}
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label">Hasta</label>
-                <input
-                  type="date"
-                  name="filterTo"
-                  className="form-control custom-input"
-                  value={filters.filterTo}
-                  onChange={handleFilterChange}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="row g-3 mb-4">
-            <div className="col-md-4">
-              <div className="content-card stats-card">
-                <p className="stats-label">Servicios del período</p>
-                <h3 className="stats-value">{periodSummary.totalReservations}</h3>
-              </div>
-            </div>
-
-            <div className="col-md-4">
-              <div className="content-card stats-card">
-                <p className="stats-label">Servicios incluidos</p>
-                <h3 className="stats-value">{periodSummary.totalServices}</h3>
-              </div>
-            </div>
-
-            <div className="col-md-4">
-              <div className="content-card stats-card">
-                <p className="stats-label">Facturación del período</p>
-                <h3 className="stats-value">
-                  ${periodSummary.totalRevenue.toLocaleString("es-AR")}
-                </h3>
-              </div>
-            </div>
-          </div>
-
-          <div className="content-card mb-4">
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
-              <h4 className="mb-0">Vista calendario</h4>
-
-              <div className="d-flex align-items-center gap-2 flex-wrap">
-                <span className="results-counter">
-                  {filteredAppointments.length} resultado(s)
-                </span>
-
-                <button
-                  type="button"
-                  className="btn btn-brand btn-sm"
-                  onClick={exportToExcel}
-                  disabled={filteredAppointments.length === 0}
-                >
-                  Exportar a Excel
-                </button>
-              </div>
-            </div>
-
-            {groupedAppointments.length > 0 ? (
-              <div className="calendar-groups">
-                {groupedAppointments.map((group) => (
-                  <div key={group.date} className="calendar-day-card">
-                    <div className="calendar-day-header">
-                      <h5 className="mb-0">
-                        Inicio:{" "}
-                        {new Date(`${group.date}T00:00:00`).toLocaleDateString(
-                          "es-AR"
-                        )}
-                      </h5>
-                      <span className="results-counter">
-                        {group.items.length} servicio(s)
-                      </span>
-                    </div>
-
-                    <div className="calendar-day-list">
-                      {group.items.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`calendar-appointment-card ${
-                            isDateInRange(todayDate, item.startDate, item.endDate)
-                              ? "appointment-today"
-                              : ""
-                          } ${
-                            Number(item.balance || 0) > 0
-                              ? "appointment-pending-balance"
-                              : ""
-                          } ${
-                            item.status === "Confirmado"
-                              ? "appointment-confirmed"
-                              : ""
-                          } ${
-                            item.status === "Finalizado"
-                              ? "appointment-finished"
-                              : ""
-                          }`}
-                        >
-                          <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-                            <div>
-                              <h6 className="mb-1">{item.client}</h6>
-                              <p className="mb-0 text-muted-custom">
-                                {item.vehicle}
-                              </p>
-                              <p className="mb-0 text-muted-custom">
-                                {formatDateRange(item.startDate, item.endDate)}
-                              </p>
-                              {item.phone && (
-                                <p className="mb-0 text-muted-custom">
-                                  {item.phone}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="d-flex flex-wrap gap-2">
-                              <span
-                                className={`status-badge status-${toCssSlug(
-                                  item.status
-                                )}`}
-                              >
-                                {item.status}
-                              </span>
-                              <span
-                                className={`status-badge payment-${toCssSlug(
-                                  item.paymentStatus || "Pendiente"
-                                )}`}
-                              >
-                                {item.paymentStatus || "Pendiente"}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="services-list-cell mb-2">
-                            {item.services.map((serviceName) => (
-                              <span
-                                key={serviceName}
-                                className="mini-service-badge"
-                              >
-                                {serviceName}
-                              </span>
-                            ))}
-                          </div>
-
-                          <div className="appointment-priority-tags mb-2">
-                            {isDateInRange(todayDate, item.startDate, item.endDate) && (
-                              <span className="priority-tag today-tag">
-                                Activo hoy
-                              </span>
-                            )}
-                            {Number(item.balance || 0) > 0 && (
-                              <span className="priority-tag balance-tag">
-                                Saldo pendiente
-                              </span>
-                            )}
-                            {item.status === "Confirmado" && (
-                              <span className="priority-tag confirmed-tag">
-                                Confirmado
-                              </span>
-                            )}
-                            {item.status === "Finalizado" && (
-                              <span className="priority-tag finished-tag">
-                                Finalizado
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="payment-summary-row mb-2">
-                            <span>
-                              Total: $
-                              {Number(item.total || 0).toLocaleString("es-AR")}
-                            </span>
-                            <span>
-                              Pagado: $
-                              {Number(item.paidAmount || 0).toLocaleString(
-                                "es-AR"
-                              )}
-                            </span>
-                            <span>
-                              Saldo: $
-                              {Number(item.balance || 0).toLocaleString(
-                                "es-AR"
-                              )}
-                            </span>
-                          </div>
-
-                          {item.notes && (
-                            <div className="reservation-notes-box mb-2">
-                              <strong>Observaciones:</strong> {item.notes}
-                            </div>
-                          )}
-
-                          {(item.linkedPayments || []).length > 0 && (
-                            <div className="payment-history-box mb-2">
-                              <p className="payment-history-title mb-2">
-                                Historial de pagos ({(item.linkedPayments || []).length})
-                              </p>
-
-                              <div className="payment-history-list">
-                                {(item.linkedPayments || []).map((payment) => (
-                                  <div
-                                    key={payment.id}
-                                    className="payment-history-item"
-                                  >
-                                    <span>
-                                      {new Date(
-                                        `${payment.date}T00:00:00`
-                                      ).toLocaleDateString("es-AR")}
-                                    </span>
-                                    <span>{payment.paymentMethod}</span>
-                                    <span>
-                                      $
-                                      {Number(payment.amount).toLocaleString(
-                                        "es-AR"
-                                      )}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <strong>
-                              ${Number(item.total || 0).toLocaleString("es-AR")}
-                            </strong>
-
-                            <div className="d-flex gap-2 flex-wrap">
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-success"
-                                onClick={() => openWhatsAppReminder(item)}
-                              >
-                                WhatsApp
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-warning"
-                                onClick={() => copyReminderMessage(item)}
-                              >
-                                Copiar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-success"
-                                onClick={() => handleGoToCash(item)}
-                              >
-                                Registrar cobro
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-info"
-                                onClick={() => setSelectedAppointment(item)}
-                              >
-                                Ver detalle
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-info"
-                                onClick={() => handleEdit(item)}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-danger"
-                                onClick={() => handleDelete(item.id)}
-                              >
-                                Borrar
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {loading ? (
+              <p>Cargando reservas...</p>
+            ) : bookings.length === 0 ? (
+              <p>No hay reservas registradas todavía.</p>
             ) : (
-              <p className="mb-0 text-muted-custom">
-                No hay servicios que coincidan con los filtros.
-              </p>
-            )}
-          </div>
-
-          <div className="content-card">
-            <h4 className="mb-4">Vista tabla</h4>
-
-            <div className="table-responsive">
-              <table className="table table-dark table-hover align-middle agenda-table">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th>Teléfono</th>
-                    <th>Vehículo</th>
-                    <th>Servicios</th>
-                    <th>Desde</th>
-                    <th>Hasta</th>
-                    <th>Estado</th>
-                    <th>Pago</th>
-                    <th>Total</th>
-                    <th>Pagado</th>
-                    <th>Saldo</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAppointments.map((item) => (
-                    <tr
-                      key={item.id}
-                      className={`${
-                        isDateInRange(todayDate, item.startDate, item.endDate)
-                          ? "row-today"
-                          : ""
-                      } ${
-                        Number(item.balance || 0) > 0
-                          ? "row-pending-balance"
-                          : ""
-                      }`}
-                    >
-                      <td>{item.client}</td>
-                      <td>{item.phone || "-"}</td>
-                      <td>{item.vehicle}</td>
-                      <td>
-                        <div className="services-list-cell">
-                          {item.services.map((serviceName) => (
-                            <span
-                              key={serviceName}
-                              className="mini-service-badge"
-                            >
-                              {serviceName}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td>
-                        {new Date(
-                          `${item.startDate}T00:00:00`
-                        ).toLocaleDateString("es-AR")}
-                      </td>
-                      <td>
-                        {new Date(
-                          `${item.endDate || item.startDate}T00:00:00`
-                        ).toLocaleDateString("es-AR")}
-                      </td>
-                      <td>
-                        <span
-                          className={`status-badge status-${toCssSlug(
-                            item.status
-                          )}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`status-badge payment-${toCssSlug(
-                            item.paymentStatus || "Pendiente"
-                          )}`}
-                        >
-                          {item.paymentStatus || "Pendiente"}
-                        </span>
-                      </td>
-                      <td>
-                        ${Number(item.total || 0).toLocaleString("es-AR")}
-                      </td>
-                      <td>
-                        ${Number(item.paidAmount || 0).toLocaleString("es-AR")}
-                      </td>
-                      <td>
-                        ${Number(item.balance || 0).toLocaleString("es-AR")}
-                      </td>
-                      <td>
-                        <div className="d-flex gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-success"
-                            onClick={() => openWhatsAppReminder(item)}
-                          >
-                            WhatsApp
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-warning"
-                            onClick={() => copyReminderMessage(item)}
-                          >
-                            Copiar
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-success"
-                            onClick={() => handleGoToCash(item)}
-                          >
-                            Registrar cobro
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-info"
-                            onClick={() => setSelectedAppointment(item)}
-                          >
-                            Ver detalle
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-info"
-                            onClick={() => handleEdit(item)}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={() => handleDelete(item.id)}
-                          >
-                            Borrar
-                          </button>
-                        </div>
-                      </td>
+              <div className="table-responsive">
+                <table className="table align-middle">
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Teléfono</th>
+                      <th>Vehículo</th>
+                      <th>Servicio</th>
+                      <th>Fecha</th>
+                      <th>Hora</th>
+                      <th>Estado</th>
+                      <th>Pago</th>
+                      <th>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {filteredAppointments.length === 0 && (
-              <p className="mb-0 text-muted-custom">
-                No hay servicios que coincidan con los filtros.
-              </p>
+                  </thead>
+                  <tbody>
+                    {bookings.map((booking) => (
+                      <tr key={booking.id}>
+                        <td>{booking.customer_name}</td>
+                        <td>{booking.customer_phone}</td>
+                        <td>
+                          {booking.vehicle_type}
+                          {(booking.vehicle_brand || booking.vehicle_model) && (
+                            <>
+                              <br />
+                              <small className="text-muted">
+                                {booking.vehicle_brand || ""}{" "}
+                                {booking.vehicle_model || ""}
+                              </small>
+                            </>
+                          )}
+                        </td>
+                        <td>{booking.service_name}</td>
+                        <td>{booking.booking_date}</td>
+                        <td>{booking.booking_time}</td>
+                        <td>
+                          <select
+                            className="form-select form-select-sm"
+                            value={booking.status}
+                            onChange={(e) =>
+                              handleStatusChange(booking.id, e.target.value)
+                            }
+                          >
+                            <option value="pendiente">Pendiente</option>
+                            <option value="confirmada">Confirmada</option>
+                            <option value="en proceso">En proceso</option>
+                            <option value="finalizada">Finalizada</option>
+                            <option value="cancelada">Cancelada</option>
+                          </select>
+                        </td>
+                        <td>
+                          <select
+                            className="form-select form-select-sm"
+                            value={booking.payment_status}
+                            onChange={(e) =>
+                              handlePaymentChange(booking.id, e.target.value)
+                            }
+                          >
+                            <option value="pendiente">Pendiente</option>
+                            <option value="señado">Señado</option>
+                            <option value="pagado">Pagado</option>
+                          </select>
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleDelete(booking.id)}
+                          >
+                            Eliminar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
-
-          {selectedAppointment && (
-            <div className="content-card mt-4">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h4 className="mb-0">Detalle del servicio</h4>
-                <button
-                  type="button"
-                  className="btn btn-outline-light btn-sm"
-                  onClick={() => setSelectedAppointment(null)}
-                >
-                  Cerrar
-                </button>
-              </div>
-
-              <div className="detail-grid">
-                <div>
-                  <strong>Cliente:</strong> {selectedAppointment.client}
-                </div>
-                <div>
-                  <strong>Teléfono:</strong> {selectedAppointment.phone || "-"}
-                </div>
-                <div>
-                  <strong>Vehículo:</strong> {selectedAppointment.vehicle}
-                </div>
-                <div>
-                  <strong>Desde:</strong>{" "}
-                  {new Date(
-                    `${selectedAppointment.startDate}T00:00:00`
-                  ).toLocaleDateString("es-AR")}
-                </div>
-                <div>
-                  <strong>Hasta:</strong>{" "}
-                  {new Date(
-                    `${selectedAppointment.endDate || selectedAppointment.startDate}T00:00:00`
-                  ).toLocaleDateString("es-AR")}
-                </div>
-                <div>
-                  <strong>Estado:</strong> {selectedAppointment.status}
-                </div>
-                <div>
-                  <strong>Pago:</strong> {selectedAppointment.paymentStatus}
-                </div>
-                <div>
-                  <strong>Total:</strong> $
-                  {Number(selectedAppointment.total || 0).toLocaleString("es-AR")}
-                </div>
-                <div>
-                  <strong>Pagado:</strong> $
-                  {Number(selectedAppointment.paidAmount || 0).toLocaleString(
-                    "es-AR"
-                  )}
-                </div>
-                <div>
-                  <strong>Saldo:</strong> $
-                  {Number(selectedAppointment.balance || 0).toLocaleString(
-                    "es-AR"
-                  )}
-                </div>
-                <div>
-                  <strong>Servicios:</strong>{" "}
-                  {selectedAppointment.services.join(", ")}
-                </div>
-              </div>
-
-              {selectedAppointment.notes && (
-                <div className="reservation-notes-box mt-3">
-                  <strong>Observaciones internas:</strong>{" "}
-                  {selectedAppointment.notes}
-                </div>
-              )}
-
-              {(selectedAppointment.linkedPayments || []).length > 0 && (
-                <div className="payment-history-box mt-3">
-                  <p className="payment-history-title mb-2">
-                    Historial de pagos (
-                    {(selectedAppointment.linkedPayments || []).length})
-                  </p>
-
-                  <div className="payment-history-list">
-                    {(selectedAppointment.linkedPayments || []).map((payment) => (
-                      <div key={payment.id} className="payment-history-item">
-                        <span>
-                          {new Date(
-                            `${payment.date}T00:00:00`
-                          ).toLocaleDateString("es-AR")}
-                        </span>
-                        <span>{payment.paymentMethod}</span>
-                        <span>
-                          ${Number(payment.amount).toLocaleString("es-AR")}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </AdminLayout>

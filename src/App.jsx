@@ -15,7 +15,7 @@ import Login from './pages/Login.jsx';
 function App() {
   const location = useLocation();
 
-  const adminRoutes = ['/dashboard', '/agenda', '/estadisticas', '/caja', '/clientes'];
+  const adminRoutes = ['/dashboard', '/estadisticas', '/caja', '/clientes'];
   const isAdminPage = adminRoutes.includes(location.pathname);
 
   return (

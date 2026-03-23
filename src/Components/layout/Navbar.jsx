@@ -73,11 +73,7 @@ function Navbar() {
                   </NavLink>
                 </li>
 
-                <li className="nav-item">
-                  <NavLink className="nav-link premium-nav-link" to="/agenda">
-                    Agenda
-                  </NavLink>
-                </li>
+                
 
                 <li className="nav-item">
                   <NavLink className="nav-link premium-nav-link" to="/estadisticas">

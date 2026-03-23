@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import AdminLayout from '../components/admin/AdminLayout.jsx';
+import AdminLayout from '../Components/admin/AdminLayout.jsx';
 
 function AdminClients() {
   const appointments = JSON.parse(localStorage.getItem('adminAppointments') || '[]');
