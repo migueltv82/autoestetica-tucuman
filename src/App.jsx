@@ -6,7 +6,6 @@ import Home from './pages/Home.jsx';
 import Services from './pages/Services.jsx';
 import Booking from './pages/Booking.jsx';
 import Contact from './pages/Contact.jsx';
-import AdminAgenda from './pages/AdminAgenda.jsx';
 import AdminStats from './pages/AdminStats.jsx';
 import AdminCash from './pages/AdminCash.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
@@ -40,15 +39,7 @@ function App() {
             }
           />
 
-          <Route
-            path="/agenda"
-            element={
-              <ProtectedRoute>
-                <AdminAgenda />
-              </ProtectedRoute>
-            }
-          />
-
+          
           <Route
             path="/estadisticas"
             element={

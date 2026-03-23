@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import RevealOnScroll from '../components/ui/RevealOnScroll.jsx';
-import "../styles/Contact.css";
+import "../styles/Contact.css"
 
 function Contact() {
   return (

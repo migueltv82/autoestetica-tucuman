@@ -60,13 +60,10 @@ function AdminLayout({ title, subtitle, children }) {
             <nav className="admin-sidebar-nav">
               <NavLink to="/dashboard" className="admin-sidebar-link">
                 <i className="bi bi-speedometer2"></i>
-                {!collapsed && <span>Dashboard</span>}
+                {!collapsed && <span>Panel Principal</span>}
               </NavLink>
 
-              <NavLink to="/agenda" className="admin-sidebar-link">
-                <i className="bi bi-calendar3"></i>
-                {!collapsed && <span>Agenda</span>}
-              </NavLink>
+            
 
               <NavLink to="/clientes" className="admin-sidebar-link">
                 <i className="bi bi-people"></i>
