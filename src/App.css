@@ -4523,3 +4523,116 @@ body.theme-light .overlap-warning-box {
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(15, 23, 42, 0.1);
 }
+/* ===== BOOKING PAGE ===== */
+
+.booking-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 45%, #334155 100%);
+  padding: 40px 16px;
+}
+
+.booking-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 24px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.booking-title {
+  color: #0f172a;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.booking-subtitle {
+  color: #475569;
+  font-size: 0.98rem;
+}
+
+.booking-label {
+  color: #0f172a;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.booking-input,
+.booking-select,
+.booking-textarea {
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+
+.booking-input:focus,
+.booking-select:focus,
+.booking-textarea:focus {
+  border-color: #0f172a;
+  background: #ffffff;
+  box-shadow: 0 0 0 0.2rem rgba(15, 23, 42, 0.12);
+}
+
+.booking-input::placeholder,
+.booking-textarea::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.booking-alert-info {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  border-radius: 16px;
+}
+
+.booking-service-box {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+
+.booking-service-box p {
+  margin-bottom: 6px;
+  color: #1e293b;
+}
+
+.booking-service-box p:last-child {
+  margin-bottom: 0;
+}
+
+.booking-btn {
+  border: none;
+  border-radius: 14px;
+  padding: 13px 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: white;
+  transition: all 0.25s ease;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.22);
+}
+
+.booking-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.28);
+  background: linear-gradient(135deg, #111827 0%, #0f172a 100%);
+}
+
+.booking-btn:disabled {
+  opacity: 0.7;
+  transform: none;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .booking-page {
+    padding: 24px 10px;
+  }
+
+  .booking-card {
+    border-radius: 18px;
+  }
+}
