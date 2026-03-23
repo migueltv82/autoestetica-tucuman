@@ -9,6 +9,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
+import "../styles/AdminStats.css";
 
 function AdminStats() {
   const appointments = JSON.parse(localStorage.getItem('adminAppointments') || '[]');

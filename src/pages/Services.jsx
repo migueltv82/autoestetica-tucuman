@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import RevealOnScroll from '../components/ui/RevealOnScroll.jsx';
+import "../styles/Services.css";
 
 function Services() {
   const services = [

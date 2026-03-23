@@ -1,0 +1,121 @@
+.payment-pendiente,
+.payment-señado,
+.payment-pagado {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 110px;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.payment-pendiente {
+  background: rgba(250, 204, 21, 0.14);
+  border: 1px solid rgba(250, 204, 21, 0.26);
+  color: #facc15;
+}
+
+.payment-señado {
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(59, 130, 246, 0.26);
+  color: #60a5fa;
+}
+
+.payment-pagado {
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.26);
+  color: #34d399;
+}
+
+.payment-summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.payment-history-box,
+.reservation-notes-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 1.2rem;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
+}
+
+.payment-history-title {
+  color: var(--text-main);
+  font-weight: 800;
+  margin-bottom: 0.85rem;
+}
+
+.payment-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.payment-history-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.payment-history-item strong {
+  color: var(--text-main);
+}
+
+.payment-history-item span,
+.payment-history-item small,
+.payment-history-item p {
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.9rem;
+}
+
+.detail-grid > div {
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.detail-grid strong {
+  display: block;
+  color: var(--text-main);
+  margin-bottom: 0.25rem;
+}
+
+.detail-grid span,
+.detail-grid p,
+.detail-grid small {
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.reservation-notes-box p,
+.reservation-notes-box small,
+.reservation-notes-box span {
+  color: var(--text-soft);
+  margin: 0;
+}
+
+body.theme-light .payment-history-item,
+body.theme-light .detail-grid > div {
+  background: rgba(15, 23, 42, 0.03);
+  border-color: rgba(15, 23, 42, 0.08);
+}

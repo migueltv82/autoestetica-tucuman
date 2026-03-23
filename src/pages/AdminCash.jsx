@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
+import "../styles/AdminCash.css";
 
 function AdminCash() {
   const [searchParams, setSearchParams] = useSearchParams();

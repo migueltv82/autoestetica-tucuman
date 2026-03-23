@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import RevealOnScroll from '../components/ui/RevealOnScroll.jsx';
-
+import "../styles/Home.css";
 function Home() {
   const testimonials = [
     {

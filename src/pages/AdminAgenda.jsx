@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
+import "../styles/AdiminAgenda.css";
 
 function AdminAgenda() {
   const navigate = useNavigate();
