@@ -6,7 +6,8 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import "./styles/variables.css";
 import "./styles/globals.css";
-import "./styles/themes.css";import App from './App.jsx';
+import "./styles/themes.css";
+import App from './App.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(

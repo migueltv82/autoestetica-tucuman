@@ -1,130 +1,84 @@
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { useTheme } from '../../context/ThemeContext.jsx';
+import { Link, NavLink } from "react-router-dom";
+import { useState } from "react";
 import "../../styles/Navbar.css";
 
+export default function Navbar() {
+  const [isOpen, setIsOpen] = useState(false);
 
-
-function Navbar() {
-  const navigate = useNavigate();
-  const isAdminAuth = localStorage.getItem('isAdminAuth') === 'true';
-  const { theme, toggleTheme } = useTheme();
-
-  const handleLogout = () => {
-    localStorage.removeItem('isAdminAuth');
-    navigate('/');
-  };
+  const closeMenu = () => setIsOpen(false);
 
   return (
-    <nav className="navbar navbar-expand-lg premium-navbar sticky-top">
-      <div className="container">
-        <Link className="navbar-brand premium-brand" to="/">
-          <span className="brand-mark">
-            <i className="bi bi-stars"></i>
-          </span>
-          <span className="brand-copy">
-            <strong>Autoestética</strong>
-            <small>Tucumán</small>
-          </span>
-        </Link>
+    <header className="site-navbar-wrap">
+      <nav className="navbar navbar-expand-lg site-navbar">
+        <div className="container">
+          <Link to="/" className="site-brand" onClick={closeMenu}>
+            <div className="site-brand-mark">AT</div>
+            <div className="site-brand-text">
+              <span className="site-brand-title">Autoestética Tucumán</span>
+              <span className="site-brand-subtitle">Detailing & cuidado premium</span>
+            </div>
+          </Link>
 
-        <button
-          className="navbar-toggler premium-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#mainNavbar"
-          aria-controls="mainNavbar"
-          aria-expanded="false"
-          aria-label="Abrir navegación"
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
+          <button
+            className="navbar-toggler site-navbar-toggler"
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            aria-label="Abrir menú"
+          >
+            <span className="site-navbar-toggler-icon"></span>
+          </button>
 
-        <div className="collapse navbar-collapse" id="mainNavbar">
-          <ul className="navbar-nav ms-auto align-items-lg-center gap-lg-2 premium-nav-list">
-            <li className="nav-item">
-              <NavLink className="nav-link premium-nav-link" to="/">
-                Inicio
-              </NavLink>
-            </li>
+          <div className={`collapse navbar-collapse ${isOpen ? "show" : ""}`}>
+            <ul className="navbar-nav ms-auto align-items-lg-center site-navbar-links">
+              <li className="nav-item">
+                <NavLink to="/" className="nav-link site-nav-link" onClick={closeMenu}>
+                  Inicio
+                </NavLink>
+              </li>
 
-            <li className="nav-item">
-              <NavLink className="nav-link premium-nav-link" to="/servicios">
-                Servicios
-              </NavLink>
-            </li>
+              <li className="nav-item">
+                <NavLink
+                  to="/servicios"
+                  className="nav-link site-nav-link"
+                  onClick={closeMenu}
+                >
+                  Servicios
+                </NavLink>
+              </li>
 
-            <li className="nav-item">
-              <NavLink className="nav-link premium-nav-link" to="/reservas">
-                Reservas
-              </NavLink>
-            </li>
+              <li className="nav-item">
+                <NavLink
+                  to="/reservas"
+                  className="nav-link site-nav-link"
+                  onClick={closeMenu}
+                >
+                  Reservas
+                </NavLink>
+              </li>
 
-            <li className="nav-item">
-              <NavLink className="nav-link premium-nav-link" to="/contacto">
-                Contacto
-              </NavLink>
-            </li>
+              <li className="nav-item">
+                <NavLink
+                  to="/contacto"
+                  className="nav-link site-nav-link"
+                  onClick={closeMenu}
+                >
+                  Contacto
+                </NavLink>
+              </li>
 
-            {isAdminAuth && (
-              <>
-                <li className="nav-item">
-                  <NavLink className="nav-link premium-nav-link" to="/dashboard">
-                    Dashboard
-                  </NavLink>
-                </li>
-
-                
-
-                <li className="nav-item">
-                  <NavLink className="nav-link premium-nav-link" to="/estadisticas">
-                    Estadísticas
-                  </NavLink>
-                </li>
-
-                <li className="nav-item">
-                  <NavLink className="nav-link premium-nav-link" to="/caja">
-                    Caja
-                  </NavLink>
-                </li>
-
-                <li className="nav-item">
-                  <button
-                    type="button"
-                    className="btn btn-outline-light premium-ghost-btn"
-                    onClick={handleLogout}
-                  >
-                    Salir
-                  </button>
-                </li>
-              </>
-            )}
-
-            <li className="nav-item">
-              <button
-                type="button"
-                className="btn btn-outline-light premium-ghost-btn"
-                onClick={toggleTheme}
-              >
-                {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-              </button>
-            </li>
-
-            <li className="nav-item">
-              <a
-                className="btn btn-brand premium-wa-btn"
-                href="https://wa.me/5493815448147"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <i className="bi bi-whatsapp"></i>
-                <span>WhatsApp</span>
-              </a>
-            </li>
-          </ul>
+              <li className="nav-item site-navbar-cta-wrap">
+                <Link
+                  to="/reservas"
+                  className="btn site-navbar-cta"
+                  onClick={closeMenu}
+                >
+                  Reservar turno
+                </Link>
+              </li>
+            </ul>
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 }
-
-export default Navbar;

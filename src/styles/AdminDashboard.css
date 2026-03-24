@@ -492,3 +492,87 @@ body.theme-light .agenda-day-header {
   background: rgba(15, 23, 42, 0.03);
   border-color: rgba(15, 23, 42, 0.08);
 }
+.agenda-card-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.agenda-card {
+  background: var(--bg-card, rgba(17, 24, 39, 0.72));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 1rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(12px);
+}
+
+.agenda-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.agenda-card-client {
+  color: var(--text-main, #f5f7fa);
+  font-weight: 800;
+}
+
+.agenda-card-service {
+  color: var(--text-soft, #d1d5db);
+}
+
+.agenda-card-time {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(0, 191, 166, 0.12);
+  border: 1px solid rgba(0, 191, 166, 0.2);
+  color: #8ef4e7;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.agenda-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.9rem;
+}
+
+.agenda-card-grid small,
+.agenda-card-notes small {
+  display: block;
+  color: var(--text-muted, #94a3b8);
+  margin-bottom: 0.3rem;
+}
+
+.agenda-card-grid p,
+.agenda-card-notes p {
+  color: var(--text-soft, #d1d5db);
+}
+
+.agenda-card-notes {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.agenda-card-actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .agenda-card-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .agenda-card-time {
+    width: fit-content;
+  }
+}

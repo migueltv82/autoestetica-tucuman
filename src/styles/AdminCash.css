@@ -40,11 +40,13 @@
 .payment-history-box,
 .reservation-notes-box {
   background: var(--bg-card);
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--line);
   border-radius: 22px;
   padding: 1.2rem;
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  height: 100%;
 }
 
 .payment-history-title {
@@ -79,6 +81,12 @@
 .payment-history-item p {
   color: var(--text-soft);
   margin: 0;
+}
+
+.payment-history-amount {
+  font-weight: 800;
+  color: var(--accent);
+  white-space: nowrap;
 }
 
 .detail-grid {
@@ -118,4 +126,18 @@ body.theme-light .payment-history-item,
 body.theme-light .detail-grid > div {
   background: rgba(15, 23, 42, 0.03);
   border-color: rgba(15, 23, 42, 0.08);
+}
+
+@media (max-width: 768px) {
+  .payment-history-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .payment-pendiente,
+  .payment-señado,
+  .payment-pagado {
+    min-width: unset;
+    width: fit-content;
+  }
 }
