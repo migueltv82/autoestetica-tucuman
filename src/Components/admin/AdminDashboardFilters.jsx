@@ -4,37 +4,39 @@ export default function AdminDashboardFilters({
   onReload,
 }) {
   return (
-    <div className="card shadow-sm border-0 mb-4">
-      <div className="card-body">
-        <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
-          <h5 className="mb-0">Agenda de reservas</h5>
+    <section className="admin-filters-panel-v2">
+      <div className="admin-filters-head">
+        <div>
+          <p className="admin-filters-kicker">Agenda</p>
+          <h3 className="admin-filters-title">Filtros de reservas</h3>
+        </div>
 
-          <button className="btn btn-dark" onClick={onReload}>
-            Recargar
+        <button className="btn btn-brand-dark" onClick={onReload}>
+          <i className="bi bi-arrow-clockwise me-2"></i>
+          Recargar
+        </button>
+      </div>
+
+      <div className="admin-filters-grid">
+        <div className="admin-filter-field">
+          <label className="form-label">Filtrar por fecha</label>
+          <input
+            type="date"
+            className="form-control admin-filter-input"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
+        </div>
+
+        <div className="admin-filter-actions">
+          <button
+            className="btn btn-outline-secondary"
+            onClick={() => setSelectedDate("")}
+          >
+            Limpiar filtro
           </button>
         </div>
-
-        <div className="row g-3">
-          <div className="col-md-4">
-            <label className="form-label">Filtrar por fecha</label>
-            <input
-              type="date"
-              className="form-control"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
-          </div>
-
-          <div className="col-md-4 d-flex align-items-end">
-            <button
-              className="btn btn-outline-secondary"
-              onClick={() => setSelectedDate("")}
-            >
-              Limpiar filtro
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </section>
   );
 }

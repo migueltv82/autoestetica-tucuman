@@ -1,171 +1,182 @@
-import { NavLink, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import "../../styles/AdminLayout.css";
+
+const navItems = [
+  {
+    to: "/dashboard",
+    icon: "bi bi-speedometer2",
+    label: "Dashboard",
+    description: "Resumen general",
+  },
+  {
+    to: "/dashboard",
+    icon: "bi bi-calendar-check",
+    label: "Reservas",
+    description: "Agenda y gestión",
+  },
+  {
+    to: "/clientes",
+    icon: "bi bi-people",
+    label: "Clientes",
+    description: "Base de clientes",
+  },
+  {
+    to: "/caja",
+    icon: "bi bi-cash-coin",
+    label: "Caja",
+    description: "Cobros e ingresos",
+  },
+  {
+    to: "/estadisticas",
+    icon: "bi bi-bar-chart-line",
+    label: "Estadísticas",
+    description: "Métricas del negocio",
+  },
+];
 
 function AdminLayout({ title, subtitle, children }) {
   const navigate = useNavigate();
 
   const [collapsed, setCollapsed] = useState(() => {
-    return localStorage.getItem('adminSidebarCollapsed') === 'true';
+    return localStorage.getItem("adminSidebarCollapsed") === "true";
   });
 
   useEffect(() => {
-    localStorage.setItem('adminSidebarCollapsed', collapsed);
+    localStorage.setItem("adminSidebarCollapsed", String(collapsed));
   }, [collapsed]);
 
-  const today = new Date().toLocaleDateString('es-AR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
+  const todayLabel = useMemo(() => {
+    return new Date().toLocaleDateString("es-AR", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('isAdminAuth');
-    navigate('/');
+    localStorage.removeItem("isAdminAuth");
+    navigate("/");
   };
 
   const handleGoSite = () => {
-    navigate('/');
+    navigate("/");
   };
 
   return (
-    <section className="admin-layout-section">
-      <div className="container-fluid py-4">
-        <div className={`admin-layout-grid ${collapsed ? 'sidebar-collapsed' : ''}`}>
-          <aside className="admin-sidebar">
-            <div className="admin-sidebar-brand-row">
-              <div className="admin-sidebar-brand">
-                <div className="admin-sidebar-brand-mark">
-                  <i className="bi bi-grid-1x2-fill"></i>
+    <section className="admin-shell">
+      <div className={`admin-shell-grid ${collapsed ? "is-collapsed" : ""}`}>
+        <aside className="admin-sidebar-v2">
+          <div className="admin-sidebar-top">
+            <div className="admin-brand-wrap">
+              <div className="admin-brand-mark">
+                <i className="bi bi-stars"></i>
+              </div>
+
+              {!collapsed && (
+                <div className="admin-brand-text">
+                  <strong>Autoestética Tucumán</strong>
+                  <span>Panel de administración</span>
                 </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="admin-collapse-btn"
+              onClick={() => setCollapsed((prev) => !prev)}
+              title={collapsed ? "Expandir menú" : "Contraer menú"}
+            >
+              <i className={`bi ${collapsed ? "bi-chevron-right" : "bi-chevron-left"}`}></i>
+            </button>
+          </div>
+
+          {!collapsed && (
+            <div className="admin-sidebar-intro">
+              <span className="admin-pill">Admin</span>
+              <p className="mb-0">
+                Gestión interna del taller, reservas, caja y seguimiento operativo.
+              </p>
+            </div>
+          )}
+
+          <nav className="admin-nav-v2">
+            {navItems.map((item) => (
+              <NavLink
+                key={`${item.to}-${item.label}`}
+                to={item.to}
+                className={({ isActive }) =>
+                  `admin-nav-link ${isActive ? "active" : ""}`
+                }
+              >
+                <span className="admin-nav-icon">
+                  <i className={item.icon}></i>
+                </span>
 
                 {!collapsed && (
-                  <div>
-                    <strong>Panel Admin</strong>
-                    <span>Autoestética Tucumán</span>
-                  </div>
+                  <span className="admin-nav-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.description}</small>
+                  </span>
                 )}
-              </div>
+              </NavLink>
+            ))}
+          </nav>
 
-              <button
-                type="button"
-                className="admin-sidebar-toggle"
-                onClick={() => setCollapsed((prev) => !prev)}
-                title={collapsed ? 'Expandir menú' : 'Contraer menú'}
-              >
-                <i className={`bi ${collapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
-              </button>
+          <div className="admin-sidebar-bottom">
+            <button
+              type="button"
+              className="admin-side-action admin-side-action-site"
+              onClick={handleGoSite}
+            >
+              <i className="bi bi-house-door"></i>
+              {!collapsed && <span>Ver sitio</span>}
+            </button>
+
+            <button
+              type="button"
+              className="admin-side-action admin-side-action-logout"
+              onClick={handleLogout}
+            >
+              <i className="bi bi-box-arrow-right"></i>
+              {!collapsed && <span>Salir</span>}
+            </button>
+          </div>
+        </aside>
+
+        <div className="admin-main-v2">
+          <header className="admin-topbar-v2">
+            <div className="admin-topbar-left">
+              <span className="admin-topbar-badge">
+                <i className="bi bi-shield-lock"></i>
+                Panel interno
+              </span>
+
+              <div className="admin-topbar-date">{todayLabel}</div>
             </div>
 
-            <nav className="admin-sidebar-nav">
-              <NavLink to="/dashboard" className="admin-sidebar-link">
-                <i className="bi bi-speedometer2"></i>
-                {!collapsed && <span>Panel Principal</span>}
-              </NavLink>
-
-            
-
-              <NavLink to="/clientes" className="admin-sidebar-link">
-                <i className="bi bi-people"></i>
-                {!collapsed && <span>Clientes</span>}
-              </NavLink>
-
-              <NavLink to="/estadisticas" className="admin-sidebar-link">
-                <i className="bi bi-bar-chart-line"></i>
-                {!collapsed && <span>Estadísticas</span>}
-              </NavLink>
-
-              <NavLink to="/caja" className="admin-sidebar-link">
-                <i className="bi bi-cash-stack"></i>
-                {!collapsed && <span>Caja</span>}
-              </NavLink>
-            </nav>
-
-            <div className="admin-sidebar-bottom">
+            <div className="admin-topbar-right">
               <button
                 type="button"
-                className="admin-sidebar-action"
+                className="admin-topbar-btn admin-topbar-btn-site"
                 onClick={handleGoSite}
               >
-                <i className="bi bi-house-door"></i>
-                {!collapsed && <span>Ver sitio</span>}
-              </button>
-
-              <a
-                href="https://wa.me/"
-                target="_blank"
-                rel="noreferrer"
-                className="admin-sidebar-action"
-              >
-                <i className="bi bi-whatsapp"></i>
-                {!collapsed && <span>WhatsApp</span>}
-              </a>
-
-              <button
-                type="button"
-                className="admin-sidebar-action danger"
-                onClick={handleLogout}
-              >
-                <i className="bi bi-box-arrow-right"></i>
-                {!collapsed && <span>Salir</span>}
+                <i className="bi bi-box-arrow-up-right"></i>
+                <span>Ir al sitio</span>
               </button>
             </div>
-          </aside>
+          </header>
 
-          <div className="admin-main-panel">
-            <div className="admin-topbar">
-              <div className="admin-topbar-left">
-                <div className="admin-topbar-badge">
-                  <i className="bi bi-person-check-fill"></i>
-                  <span>Administrador</span>
-                </div>
-
-                <div className="admin-topbar-date">
-                  <i className="bi bi-calendar-event"></i>
-                  <span>{today}</span>
-                </div>
-              </div>
-
-              <div className="admin-topbar-actions">
-                <a
-                  href="https://wa.me/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-outline-light admin-topbar-btn"
-                >
-                  <i className="bi bi-whatsapp"></i>
-                  <span>WhatsApp</span>
-                </a>
-
-                <button
-                  type="button"
-                  className="btn btn-outline-light admin-topbar-btn"
-                  onClick={handleGoSite}
-                >
-                  <i className="bi bi-house-door"></i>
-                  <span>Ver sitio</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-outline-danger admin-topbar-btn"
-                  onClick={handleLogout}
-                >
-                  <i className="bi bi-box-arrow-right"></i>
-                  <span>Salir</span>
-                </button>
-              </div>
+          <div className="admin-page-head-v2">
+            <div>
+              <p className="admin-page-kicker">Administración</p>
+              <h1 className="admin-page-title-v2">{title}</h1>
+              {subtitle && <p className="admin-page-subtitle-v2">{subtitle}</p>}
             </div>
-
-            <div className="admin-page-header">
-              <div>
-                <h1 className="admin-page-title">{title}</h1>
-                {subtitle && <p className="admin-page-subtitle mb-0">{subtitle}</p>}
-              </div>
-            </div>
-
-            <div className="admin-page-content">{children}</div>
           </div>
+
+          <main className="admin-content-v2">{children}</main>
         </div>
       </div>
     </section>

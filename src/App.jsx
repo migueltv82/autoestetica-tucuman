@@ -1,7 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './Components/layout/Navbar.jsx';
 import Footer from './Components/layout/Footer.jsx';
-import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ProtectedRoute from './Components/ProtectedRoute.jsx';
 import Home from './pages/Home.jsx';
 import Services from './pages/Services.jsx';
 import Booking from './pages/Booking.jsx';
@@ -15,8 +15,11 @@ import Login from './pages/Login.jsx';
 function App() {
   const location = useLocation();
 
-  const adminRoutes = ['/dashboard', '/estadisticas', '/caja', '/clientes'];
-  const isAdminPage = adminRoutes.includes(location.pathname);
+  const isAdminPage =
+    location.pathname.startsWith('/dashboard') ||
+    location.pathname.startsWith('/estadisticas') ||
+    location.pathname.startsWith('/caja') ||
+    location.pathname.startsWith('/clientes');
 
   return (
     <div>
@@ -39,7 +42,6 @@ function App() {
             }
           />
 
-          
           <Route
             path="/estadisticas"
             element={
